@@ -1,0 +1,17 @@
+{
+  "alias": {
+    "prepared-statements": {
+      "sql-statement-to-prepare": "select * from customer where id <= ?",
+      "in-param": {
+        "param": [
+          {
+            "jdbc-param-name": "AN",
+            "jdbc-param-type": "BIGINT",
+            "jdbc-param-index": 800,
+            "jdbc-param-default": 500
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+GET http://localhost:8080/rjp/func?connection=DB1&procName=tst_function&aN=123
+Accept: application/json
+
+###
+POST http://localhost:80/api/item
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="field-name"
+
+field-value
+--WebAppBoundary--
+
+
+###
+GET http://localhost:8080/rjp/dynamic?connection=DB1&procName=test_pkh.tst_function.json&aN=123
+Accept: application/json
+
+###
+GET http://localhost:8080/rjp/query?connection=DB1&sqlQuery=select%20*%20from%20customer%20where%20id%3C800
+
+###
+# curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "test_pkh.tst_function.json","aN": "123" }' http://localhost:8080/rjp/dynpst
+POST http://localhost:8080/rjp/dynpst/test_pkh.tst_function
+Content-Type: application/json
+
+{
+  "connection": "DB1",
+  "procName": "test_pkh.tst_function",
+  "aN": "123"
+}
+
+###
+# curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "prepared_statement.json","ID": 7 }' http://localhost:8080/rjp/dynpst
+POST http://localhost:8080/rjp/dynpst/prepared_statement
+Content-Type: application/json
+
+{
+  "connection": "DB2",
+  "procName": "prepared_statement",
+  "ID": 7
+}
+
+###
+POST http://localhost:8080/rjp/dynpst/test_pkh.proc_with_Param
+Content-Type: application/json
+
+{
+  "connection": "DB2",
+  "procName": "test_pkh.proc_with_Param",
+  "ID": 123
+}
+
+
+
+
+

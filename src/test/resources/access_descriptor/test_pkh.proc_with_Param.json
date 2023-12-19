@@ -1,0 +1,17 @@
+{
+  "alias": {
+    "callable-statements": {
+      "db-sp-name": "test_pkh.proc_with_Param",
+      "in-param": {
+        "param": [
+          {
+            "jdbc-param-name": "ID",
+            "jdbc-param-type": "BIGINT",
+            "jdbc-param-index": 1,
+            "jdbc-param-default": ""
+          }
+        ]
+      }
+    }
+  }
+}
