@@ -1,5 +1,7 @@
-package com.syv.RestJdbcProxy;
+package com.syv.RestJdbcProxy.controler;
 
+import com.syv.RestJdbcProxy.service.DynamicDataService;
+import com.syv.RestJdbcProxy.config.DynamicDataSourceContextHolder;
 import com.syv.RestJdbcProxy.init.AliasConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -54,7 +56,6 @@ public class DynamicDataController {
         aliasConfig.getAlias().getCallableStatements().getInParam().getParam().stream().forEach(param -> {
             inParamsDescr.put(param.getJdbcParamName().toUpperCase(), param.getJdbcParamType().toUpperCase());
         });
-
 
         String spName;
 

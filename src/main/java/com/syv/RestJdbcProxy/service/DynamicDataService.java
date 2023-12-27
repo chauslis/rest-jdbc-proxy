@@ -1,4 +1,4 @@
-package com.syv.RestJdbcProxy;
+package com.syv.RestJdbcProxy.service;
 
 
 

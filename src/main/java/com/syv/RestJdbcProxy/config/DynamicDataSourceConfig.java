@@ -1,17 +1,16 @@
-package com.syv.RestJdbcProxy;
+package com.syv.RestJdbcProxy.config;
 
+import com.syv.RestJdbcProxy.service.DynamicDataService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 
 import javax.sql.DataSource;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 

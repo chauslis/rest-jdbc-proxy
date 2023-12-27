@@ -1,4 +1,4 @@
-package com.syv.RestJdbcProxy;
+package com.syv.RestJdbcProxy.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -14,15 +14,15 @@ import java.util.List;
 @Configuration
 //@ComponentScan("com.baeldung.jdbc")
 public class SpringJdbcConfig {
-    @Bean//(name = "primaryDataSource")
-    @Primary
-    public DataSource OracleDataSource() {
-        DriverManagerDataSource dataSource = new DriverManagerDataSource();
-        dataSource.setDriverClassName("oracle.jdbc.OracleDriver");
-        dataSource.setUrl("jdbc:oracle:thin:@//localhost:11521/XEPDB1");
-        dataSource.setUsername("gt");
-        dataSource.setPassword("gt");
-
-        return dataSource;
-    }
+//    @Bean//(name = "primaryDataSource")
+//    @Primary
+//    public DataSource OracleDataSource() {
+//        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+//        dataSource.setDriverClassName("oracle.jdbc.OracleDriver");
+//        dataSource.setUrl("jdbc:oracle:thin:@//localhost:11521/XEPDB1");
+//        dataSource.setUsername("gt");
+//        dataSource.setPassword("gt");
+//
+//        return dataSource;
+//    }
 }
