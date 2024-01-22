@@ -30,6 +30,9 @@ dependencies {
 	implementation 'ch.qos.logback:logback-classic:1.4.11' // Use the latest version available
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.testcontainers:junit-jupiter'
+	//testImplementation 'org.testcontainers:oracle-xe:1.12.0'
+	testImplementation "org.testcontainers:oracle-xe:1.19.3"
 }
 
 tasks.named('bootBuildImage') {

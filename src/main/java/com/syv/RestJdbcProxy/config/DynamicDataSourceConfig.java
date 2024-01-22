@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.Resource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 
@@ -27,7 +28,6 @@ public class DynamicDataSourceConfig {
     @Value("#{${Db.connections}}")
     private Map<String,String> connections;
 
-    Map<String, DataSource> datasources;
 
     private String[] parseConnString(String connectionString) {
         String[] result = new String[3];
@@ -38,6 +38,7 @@ public class DynamicDataSourceConfig {
         result[2] = parts[1];
         return result;
     }
+    @Bean
     public Map<String, DataSource> dataSources() {
         Map<String, DataSource> dataSources = new HashMap<>();
         for (Map.Entry<String, String> entry : connections.entrySet()) {
@@ -48,14 +49,14 @@ public class DynamicDataSourceConfig {
             dataSource.setUrl(entry.getValue());
             dataSources.put(entry.getKey(), dataSource);
         }
-        datasources = dataSources;
+      //  datasources = dataSources;
         return dataSources;
     }
 
 
 
     @Bean
-    public DataSource dataSource() {
+    public DataSource dataSource(Map<String, DataSource> datasources) {
         Map<Object, Object> targetDataSources = new HashMap<>();
         AbstractRoutingDataSource routingDataSource = new AbstractRoutingDataSource() {
             @Override
@@ -64,7 +65,7 @@ public class DynamicDataSourceConfig {
             }
 
         };
-        targetDataSources.putAll(dataSources());
+        targetDataSources.putAll(datasources);
 
         routingDataSource.setTargetDataSources(targetDataSources);
         routingDataSource.afterPropertiesSet();
