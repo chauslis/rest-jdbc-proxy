@@ -20,7 +20,6 @@ import java.sql.SQLException;
 
 
 @SpringBootApplication
-//@ComponentScan(basePackages = {"com.syv.RestJdbcProxy", "com.syv.RestJdbcProxy.init"})
 public class RestJdbcProxyApplication implements ApplicationContextAware {
 	static{
 	try {
@@ -37,11 +36,12 @@ public class RestJdbcProxyApplication implements ApplicationContextAware {
 		RestJdbcProxyApplication app = (RestJdbcProxyApplication) ctx.getBean(RestJdbcProxyApplication.class);
 
 	}
-
+//	@Autowired
+//	EntityManagerFactory entityManagerFactory;
 	@Override
 	public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
-		EntityManagerFactory entityManagerFactory = applicationContext.getBean(EntityManagerFactory.class);
+	//	EntityManagerFactory entityManagerFactory = applicationContext.getBean(EntityManagerFactory.class);
 		this.applicationContext = applicationContext;
-		log.info("entityManagerFactory: {}", entityManagerFactory);
+		//log.info("entityManagerFactory: {}", entityManagerFactory);
 	}
 }

@@ -22,9 +22,9 @@ import java.util.Map;
 })
 public class DynamicDataSourceConfig {
     private static final Logger log = LoggerFactory.getLogger(DynamicDataService.class);
+
     @Autowired
     private Environment env;
-
     @Value("#{${Db.connections}}")
     private Map<String,String> connections;
 

@@ -21,13 +21,13 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @ContextConfiguration(classes = {SpringJdbcConfig.class})
 
-class DynamicDataControllerTest {
+class DynamicDataControllerTest1 {
     @Mock
     private JdbcTemplate jdbcTemplate;
     @InjectMocks
     private DynamicDataService dynamicDataService;
     @Test
-    void executeDynamicQuery() {
+    void executeDynamicQuery1() {
         // Arrange
         String sql = "SELECT * FROM your_table WHERE condition = ?";
         Map<String, Object> inParams = new HashMap<>();
@@ -40,7 +40,6 @@ class DynamicDataControllerTest {
 
         when(jdbcTemplate.queryForList(eq(sql), any(Object[].class))).thenReturn(expected);
 
-        // Act
         List<Map<String, Object>> result = dynamicDataService.executeDynamicQuery(sql, inParams);
 
         // Assert

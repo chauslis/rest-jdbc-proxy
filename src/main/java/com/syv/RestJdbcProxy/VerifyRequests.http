@@ -31,6 +31,16 @@ Content-Type: application/json
 }
 
 ###
+# curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "test_pkh.tst_function.json","aN": "123" }' http://localhost:8080/rjp/dynpst
+POST http://localhost:8080/rjp/dynpst/test_pkh.tst_function
+Content-Type: application/json
+
+{
+  "connection": "DB1",
+  "aN": "123"
+}
+
+###
 # curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "prepared_statement.json","ID": 7 }' http://localhost:8080/rjp/dynpst
 POST http://localhost:8080/rjp/dynpst/prepared_statement
 Content-Type: application/json
