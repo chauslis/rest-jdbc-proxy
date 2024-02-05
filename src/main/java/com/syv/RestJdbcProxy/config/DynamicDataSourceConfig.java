@@ -7,19 +7,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.Environment;
-import org.springframework.core.io.Resource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
+
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 import javax.sql.DataSource;
 import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
-@PropertySources({
-        //@PropertySource("classpath:application.properties")
-        @PropertySource("application.properties")
-})
 public class DynamicDataSourceConfig {
     private static final Logger log = LoggerFactory.getLogger(DynamicDataService.class);
 
@@ -38,8 +36,35 @@ public class DynamicDataSourceConfig {
         result[2] = parts[1];
         return result;
     }
+
+    public DataSource creteDataSource(String url, String username, String password, String driverClassName) {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(url);
+        config.setUsername(username);
+        config.setPassword(password);
+        config.setDriverClassName(driverClassName);
+        return new HikariDataSource(config);
+    }
+
     @Bean
     public Map<String, DataSource> dataSources() {
+        Map<String, DataSource> dataSources = new HashMap<>();
+        for (Map.Entry<String, String> entry : connections.entrySet()) {
+            String[] conn = parseConnString(entry.getValue());
+            log.info (String.format("key: {%s}, value: {%s}", entry.getKey(), conn[0]+"/"+conn[1] + "://" + conn[2]));
+            HikariConfig config = new HikariConfig();
+            //todo: add driverClassName into parameters
+            // config.setDriverClassName("org.postgresql.Driver");
+            config.setJdbcUrl(entry.getValue());
+            //todo: add min/max pool size paramets
+             config.setMaximumPoolSize(20);
+            // config.setDriverClassName("org.postgresql.Driver");
+            dataSources.put(entry.getKey(), new HikariDataSource(config));
+        }
+        return dataSources;
+    }
+  //  @Bean
+    public Map<String, DataSource> dataSources1() {
         Map<String, DataSource> dataSources = new HashMap<>();
         for (Map.Entry<String, String> entry : connections.entrySet()) {
             String[] conn = parseConnString(entry.getValue());
@@ -53,11 +78,9 @@ public class DynamicDataSourceConfig {
         return dataSources;
     }
 
-
-
     @Bean
     public DataSource dataSource(Map<String, DataSource> datasources) {
-        Map<Object, Object> targetDataSources = new HashMap<>();
+        Map<Object, Object> targetDataSources = new HashMap<>(datasources);
         AbstractRoutingDataSource routingDataSource = new AbstractRoutingDataSource() {
             @Override
             protected String determineCurrentLookupKey() {
@@ -65,8 +88,6 @@ public class DynamicDataSourceConfig {
             }
 
         };
-        targetDataSources.putAll(datasources);
-
         routingDataSource.setTargetDataSources(targetDataSources);
         routingDataSource.afterPropertiesSet();
         DynamicDataSourceContextHolder.setDataSourceKey("DB1");
