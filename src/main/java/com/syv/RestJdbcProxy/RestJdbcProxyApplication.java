@@ -36,8 +36,7 @@ public class RestJdbcProxyApplication implements ApplicationContextAware {
 		RestJdbcProxyApplication app = (RestJdbcProxyApplication) ctx.getBean(RestJdbcProxyApplication.class);
 
 	}
-//	@Autowired
-//	EntityManagerFactory entityManagerFactory;
+
 	@Override
 	public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
 	//	EntityManagerFactory entityManagerFactory = applicationContext.getBean(EntityManagerFactory.class);

@@ -1,0 +1,48 @@
+{
+  "alias": {
+    "callable-statements": {
+      "db-sp-name": "test_pkh.proc_with_OutParam",
+      "in-param": {
+        "param": [
+          {
+            "jdbc-param-name": "ID",
+            "jdbc-param-type": "BIGINT",
+            "jdbc-param-index": 1,
+            "jdbc-param-default": ""
+          },
+          {
+            "jdbc-param-name": "Name",
+            "jdbc-param-type": "VARCHAR",
+            "jdbc-param-index": 2,
+            "jdbc-param-default": ""
+          },
+          {
+            "jdbc-param-name": "p",
+            "jdbc-param-type": "VARCHAR",
+            "jdbc-param-index": 6,
+            "jdbc-param-default": ""
+          }
+        ]
+      },
+      "out-param": {
+        "param": [
+          {
+            "jdbc-param-name": "out1",
+            "jdbc-param-type": "VARCHAR",
+            "jdbc-param-index": 3
+          },
+          {
+            "jdbc-param-name": "out2",
+            "jdbc-param-type": "VARCHAR",
+            "jdbc-param-index": 4
+          },
+          {
+            "jdbc-param-name": "out3",
+            "jdbc-param-type": "VARCHAR",
+            "jdbc-param-index": 5
+          }
+        ]
+      }
+    }
+  }
+}

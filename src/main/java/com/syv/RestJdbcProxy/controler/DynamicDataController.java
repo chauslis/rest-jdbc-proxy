@@ -51,11 +51,17 @@ public class DynamicDataController {
         return responseEntity;
     }
 
-    private ResponseEntity<List<Map<String, Object>>> getResponseFromSP(Map<String, Object> parameters, AliasConfig aliasConfig) {
-        Map<String, String> inParamsDescr = new HashMap<>();
-        aliasConfig.getAlias().getCallableStatements().getInParam().getParam().stream().forEach(param -> {
-            inParamsDescr.put(param.getJdbcParamName().toUpperCase(), param.getJdbcParamType().toUpperCase());
+    private Map<String,String> convertParamList2Map (List<AliasConfig.Param>  formalPrams){
+        Map<String,String> formalPramsMap = new HashMap<>();
+        formalPrams.stream().forEach(param -> {
+            formalPramsMap.put(param.getJdbcParamName().toUpperCase(), param.getJdbcParamType().toUpperCase());
         });
+        return formalPramsMap;
+    }
+    private ResponseEntity<List<Map<String, Object>>> getResponseFromSP(Map<String, Object> parameters, AliasConfig aliasConfig) {
+        Map<String, String> inParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getInParam().getParam()));
+        Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getOutParam().getParam()));
+
 
         String spName;
 
@@ -72,19 +78,11 @@ public class DynamicDataController {
             spName = parts[0];
 
         Map<String, Object> outPartams = new HashMap<>();
-//        Map<String, Object> outPartamsDescription = new HashMap<>();
-//        aliasConfig.getAlias().getCallableStatements().getOutParam().getParam().stream().forEach(param -> {
-//            outPartamsDescription.put(param.getJdbcParamName().toUpperCase(), params.get(param.getJdbcParamName().toUpperCase() ));
-//        });
-        String outParamType = null;
-        if (aliasConfig.getAlias().getCallableStatements().getOutParam() != null)
-            outParamType = aliasConfig.getAlias().getCallableStatements().getOutParam().getParam().get(0).getJdbcParamType();
 
-        outPartams = dynamicDataService.executeStoreFuncWithDynamicParams(getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamType);
+        outPartams = dynamicDataService.executeStoreFuncWithDynamicParams(getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamsDescr);
         List<Map<String, Object>> out = new ArrayList<>();
         out.add(outPartams);
-        //      params.entrySet().stream().forEach(System.out::println);
-        log.info("ResponseEntity result: {}", out);
+        log.debug("ResponseEntity result: {}", out);
         return new ResponseEntity<>(out, HttpStatus.OK);
     }
 

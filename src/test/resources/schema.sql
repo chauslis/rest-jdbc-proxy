@@ -27,35 +27,51 @@ INSERT INTO CUSTOMER (ID, FIRST_NAME, LAST_NAME) VALUES(11, 'Jack', 'Bauer')
 
 CREATE OR REPLACE PACKAGE test_pkh
 AS
+
     PROCEDURE tst_proc;
-    FUNCTION tst_function(aN VARCHAR2 )return VARCHAR2;
+    FUNCTION tst_function(aN VARCHAR2 )
+        return VARCHAR2;
     PROCEDURE proc_with_Param(Id NUMBER);
     FUNCTION tst_functionInt(aN NUMBER )
         return VARCHAR2;
+    PROCEDURE proc_with_OutParam(Id NUMBER, Name VARCHAR2, out1 OUT VARCHAR2, OUT2 OUT VARCHAR2, OUT3 OUT VARCHAR2, p VARCHAR2);
 END;
 /
 CREATE OR REPLACE PACKAGE BODY test_pkh
 IS
+
     PROCEDURE tst_proc
         is
     BEGIN
         NULL;
     END;
+
     FUNCTION tst_function(aN VARCHAR2  ) return VARCHAR2
         is
     BEGIN
         RETURN 1;
     END;
+
     PROCEDURE proc_with_Param(Id NUMBER)
         IS
     BEGIN
         NULL;
     END;
+
     FUNCTION tst_functionInt(aN Number )
         return VARCHAR2
         is
     BEGIN
         RETURN 1;
     END;
+
+    PROCEDURE proc_with_OutParam(Id NUMBER, Name VARCHAR2, out1 OUT VARCHAR2, OUT2 OUT VARCHAR2, OUT3 OUT VARCHAR2, p VARCHAR2)
+        IS
+    BEGIN
+        out1 := 'out1';
+        out2 := Name;
+        out3 := p;
+    END;
+
 END;
 /

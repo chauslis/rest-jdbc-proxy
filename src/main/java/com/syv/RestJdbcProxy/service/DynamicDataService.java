@@ -46,7 +46,47 @@ public class DynamicDataService {
     public Map<String, Object> executeDynamicQueryWithOutParams(String sqlQuery) {
         return jdbcTemplate.queryForMap(sqlQuery);
     }
+    @Transactional
+    public Map<String, Object> executeStoreFuncWithDynamicParams(String catalog, String storedProcName, Map<String, String> formalInParams, Map<String, Object> inParams, Map<String, String> formalOutParams) {
+        SimpleJdbcCall simpleJdbcCall = new SimpleJdbcCall(jdbcTemplate)
+                .withCatalogName(catalog);
+                //.withProcedureName(storedProcName)
+                //.withFunctionName (storedProcName);
+        String outParamsType = null;
+        if (formalOutParams != null && formalOutParams.size() > 0 && formalOutParams.containsKey("RESULT")){
+            simpleJdbcCall.withFunctionName(storedProcName);
+            outParamsType = formalOutParams.get("RESULT");
+            formalOutParams.remove("RESULT");
+        }else
+            simpleJdbcCall.withProcedureName(storedProcName);
 
+        formalOutParams
+                .entrySet()
+                .stream()
+                .forEach(param -> { simpleJdbcCall.declareParameters(
+                        new SqlOutParameter(param.getKey().toUpperCase(),
+                                convertStringToJdbcType(param.getValue().toUpperCase()))); });
+
+        formalInParams
+                .entrySet()
+                .stream()
+                .forEach(param -> { simpleJdbcCall.declareParameters(
+                        new SqlParameter(param.getKey().toUpperCase(),
+                                convertStringToJdbcType(param.getValue().toUpperCase()))); });
+        Object result = null;
+        Map<String, Object> outParams;
+        if (outParamsType != null) {
+            int tType = convertStringToJdbcType(outParamsType);
+            Class<?> returnType = convertSqlTypeToJavaClass(tType);
+            outParams = new HashMap<>();
+            result = simpleJdbcCall.executeFunction(convertSqlTypeToJavaClass(tType), inParams);
+            outParams.put("result", result);// todo: support difernt out paranmetr function result
+        }else{
+            outParams =  simpleJdbcCall.execute(inParams);
+        }
+        return outParams;
+
+    }
 
     @Transactional
     public Map<String, Object> executeStoreFuncWithDynamicParams(String catalog, String storedProcName, Map<String, String> formalParams, Map<String, Object> inParams, String outParamsType) {

@@ -50,16 +50,17 @@ Content-Type: application/json
   "ID": 7
 }
 
+
 ###
-POST http://localhost:8080/rjp/dynpst/test_pkh.proc_with_Param
+POST http://localhost:8080/rjp/dynpst/test_pkh.proc_with_OutParam
 Content-Type: application/json
 
 {
   "connection": "DB2",
-  "ID": 123
+  "ID": 123,
+  "NAME": "test",
+  "P": "INPUT p parametr value"
 }
-
-
 
 
 
