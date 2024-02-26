@@ -56,11 +56,85 @@ POST http://localhost:8080/rjp/dynpst/test_pkh.proc_with_OutParam
 Content-Type: application/json
 
 {
-  "connection": "DB2",
+  "connection": "DB1",
   "ID": 123,
   "NAME": "test",
   "P": "INPUT p parametr value"
 }
 
 
+###
+POST http://localhost:8080/rjp/batch/test_pkh.tst_function
+Content-Type: application/json
 
+  [
+    {"connection": "DB1",
+      "aN": "123"
+    },
+    {"connection": "DB1",
+      "aN": "23"
+    },
+    {"connection": "DB1",
+      "aN": "3"
+    },
+    {"connection": "DB1",
+      "aN": "321"
+    }
+
+  ]
+
+###
+POST http://localhost:8080/rjp/batch/test_pkh.proc_with_OutParam
+Content-Type: application/json
+
+[
+  {
+    "connection": "DB1",
+    "ID": 123,
+    "NAME": "test1",
+    "P": "INPUT p parametr value 1"
+  },
+  {
+    "connection": "DB1",
+    "ID": 223,
+    "NAME": "test2",
+    "P": "INPUT p parametr value 2"
+  },
+  {
+    "connection": "DB1",
+    "ID": 323,
+    "NAME": "test3",
+    "P": "INPUT p parametr value 3"
+  },
+  {
+    "connection": "DB1",
+    "ID": 423,
+    "NAME": "test4",
+    "P": "INPUT p parametr value 4"
+  },
+  {
+  "connection": "DB1",
+  "ID": 123,
+  "NAME": "test1",
+  "P": "INPUT p parametr value 1"
+},
+  {
+    "connection": "DB1",
+    "ID": 223,
+    "NAME": "test2",
+    "P": "INPUT p parametr value 2"
+  },
+  {
+    "connection": "DB1",
+    "ID": 323,
+    "NAME": "test3",
+    "P": "INPUT p parametr value 3"
+  }
+,
+  {
+    "connection": "DB1",
+    "ID": 423,
+    "NAME": "test4",
+    "P": "INPUT p parametr value 4"
+  }
+]

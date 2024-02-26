@@ -13,15 +13,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @RestController
-//@RequestMapping("/api/dynamic")
 public class DynamicDataController {
 
     private static final Logger log = LoggerFactory.getLogger(DynamicDataController.class);
+    private static final int THREAD_NUMBER = 10;
 
     @Autowired
     private DynamicDataService dynamicDataService;
@@ -30,14 +31,52 @@ public class DynamicDataController {
     public Map<String, AliasConfig> aliasConfigMap;
 
 
+    @RequestMapping(value = "/batch/{aliasName}/**")
+    public ResponseEntity<List<Map<String, Object>>> executeAliasBatch(@PathVariable String aliasName, @RequestBody List<Map<String, Object>> parameters)
+   // public ResponseEntity<List<Map<String, Object>>> executeAliasP(@PathVariable String aliasName, @RequestBody Map<String, Object> parameters)
+    {
+        log.info("ResponseEntity parameters:  {}", parameters);
+
+        String procName = aliasName;//(String) parameters.get("procName");
+        parameters.remove("connection");
+        parameters.remove("procName");
+
+        AliasConfig aliasConfig = aliasConfigMap.get(procName);
+        ResponseEntity<List<Map<String, Object>>> responseEntity = null;
+        // Iterate through each set of parameters and call the stored procedure
+        responseEntity = getResponseFromBatchSP(parameters, aliasConfig);
+        return responseEntity;
+    }
+
+    private ResponseEntity<List<Map<String, Object>>> getResponseFromBatchSP( List<Map<String, Object>> parameters, AliasConfig aliasConfig) {
+
+        Map<String, String> inParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getInParam().getParam()));
+        Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getOutParam().getParam()));
+
+        String connection = (String) parameters.get(0).get("connection");//TBD add option work with different conne3ctions
+        String spName = getSpName(aliasConfig);
+        List<Map<String, Object>> outParams = new ArrayList<>();
+        try {
+            outParams  = dynamicDataService.distributeAndExecute(connection, getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamsDescr, THREAD_NUMBER);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+//        List<Map<String, Object>> out = new ArrayList<>();
+//        out.add(outPartams);
+        log.debug("ResponseEntity result: {}", outParams);
+        return new ResponseEntity<>(outParams, HttpStatus.OK);
+    }
+
     @RequestMapping(value = "/dynpst/{aliasName}/**", method = RequestMethod.POST)
     public ResponseEntity<List<Map<String, Object>>> executeAliasP(@PathVariable String aliasName, @RequestBody Map<String, Object> parameters) {
 
         log.info("ResponseEntity parameters: connection: {}", parameters);
         String connection = (String) parameters.get("connection");
-        DynamicDataSourceContextHolder.setDataSourceKey(connection);
         String procName = aliasName;//(String) parameters.get("procName");
-        parameters.remove("connection");
+        parameters.remove("connection");//toDo use connection from paramters
         parameters.remove("procName");
 
         AliasConfig aliasConfig = aliasConfigMap.get(procName);
@@ -46,7 +85,7 @@ public class DynamicDataController {
             responseEntity = getResponseFromQuery(parameters, aliasConfig);
         } else {
 
-            responseEntity = getResponseFromSP(parameters, aliasConfig);
+            responseEntity = getResponseFromSP(connection, parameters, aliasConfig);
         }
         return responseEntity;
     }
@@ -58,13 +97,27 @@ public class DynamicDataController {
         });
         return formalPramsMap;
     }
-    private ResponseEntity<List<Map<String, Object>>> getResponseFromSP(Map<String, Object> parameters, AliasConfig aliasConfig) {
+    private ResponseEntity<List<Map<String, Object>>> getResponseFromSP(String connection, Map<String, Object> parameters, AliasConfig aliasConfig) {
         Map<String, String> inParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getInParam().getParam()));
         Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getOutParam().getParam()));
 
 
         String spName;
 
+        spName = getSpName(aliasConfig);
+
+        Map<String, Object> outPartams = new HashMap<>();
+
+        outPartams = dynamicDataService.executeStoreFuncWithDynamicParams(connection, getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamsDescr);
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        out.add(outPartams);
+        log.debug("ResponseEntity result: {}", out);
+        return new ResponseEntity<>(out, HttpStatus.OK);
+    }
+
+    private static String getSpName(AliasConfig aliasConfig) {
+        String spName;
         String[] parts = aliasConfig.getAlias().getCallableStatements().getDbSpName().split("[\\s,()]+");
         if (parts[0].toUpperCase().equals("CALL")) {
             if (parts[1].toUpperCase().equals("?")) {
@@ -76,14 +129,7 @@ public class DynamicDataController {
             }
         } else
             spName = parts[0];
-
-        Map<String, Object> outPartams = new HashMap<>();
-
-        outPartams = dynamicDataService.executeStoreFuncWithDynamicParams(getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamsDescr);
-        List<Map<String, Object>> out = new ArrayList<>();
-        out.add(outPartams);
-        log.debug("ResponseEntity result: {}", out);
-        return new ResponseEntity<>(out, HttpStatus.OK);
+        return spName;
     }
 
     private ResponseEntity<List<Map<String, Object>>> getResponseFromQuery(Map<String, Object> parameters, AliasConfig aliasConfig) {
@@ -117,6 +163,5 @@ public class DynamicDataController {
         String[] parts = spName.split("\\.");
         return parts[1];
     }
-
 
 }

@@ -12,12 +12,16 @@ import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 import javax.sql.DataSource;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Configuration
+@EnableAsync
 public class DynamicDataSourceConfig {
     private static final Logger log = LoggerFactory.getLogger(DynamicDataService.class);
 
@@ -26,6 +30,8 @@ public class DynamicDataSourceConfig {
     @Value("#{${Db.connections}}")
     private Map<String,String> connections;
 
+    @Value("${app.thread.number}")
+    public  int ThreadNumber;
 
     private String[] parseConnString(String connectionString) {
         String[] result = new String[3];
@@ -90,7 +96,7 @@ public class DynamicDataSourceConfig {
         };
         routingDataSource.setTargetDataSources(targetDataSources);
         routingDataSource.afterPropertiesSet();
-        DynamicDataSourceContextHolder.setDataSourceKey("DB1");
+        DynamicDataSourceContextHolder.setDataSourceKey("DB1");//todo: remove hardcode: for initial datasource
         return routingDataSource;
     }
 
@@ -99,5 +105,10 @@ public class DynamicDataSourceConfig {
             return  DynamicDataSourceContextHolder.getDataSourceKey();
         }
 
+    @Bean
+    public ExecutorService executorService() {
+
+        return Executors.newFixedThreadPool(ThreadNumber); // Customize as needed
+    }
     }
 
