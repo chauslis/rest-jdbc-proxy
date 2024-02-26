@@ -78,10 +78,14 @@ public class DynamicDataService {
                                                          int numberOfThreads) throws ExecutionException, InterruptedException {
 
         List<CompletableFuture<List<Map<String,Object>>>> futureList = new LinkedList<>();
+        Integer nThread = numberOfThreads;
         int partitionSize = inParams.size() / numberOfThreads;
-        partitionSize = partitionSize < 1 ? numberOfThreads : partitionSize;
+        if(partitionSize < 1) {
+            partitionSize = 1;
+            nThread = 1;
+        }
         int end = 0;
-        for (int i = 0; i < numberOfThreads; i++) {
+        for (int i = 0; i < nThread; i++) {
             int start = i * partitionSize;
             end = (i + 1) * partitionSize;
             List<Map<String, Object>> partition = inParams.subList(start, end);

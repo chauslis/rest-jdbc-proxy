@@ -136,5 +136,54 @@ Content-Type: application/json
     "ID": 423,
     "NAME": "test4",
     "P": "INPUT p parametr value 4"
+  },
+  {
+    "connection": "DB1",
+    "ID": 123,
+    "NAME": "test1",
+    "P": "INPUT p parametr value 1"
+  },
+  {
+    "connection": "DB1",
+    "ID": 223,
+    "NAME": "test2",
+    "P": "INPUT p parametr value 2"
+  },
+  {
+    "connection": "DB1",
+    "ID": 323,
+    "NAME": "test3",
+    "P": "INPUT p parametr value 3"
+  },
+  {
+    "connection": "DB1",
+    "ID": 423,
+    "NAME": "test4",
+    "P": "INPUT p parametr value 4"
+  },
+  {
+    "connection": "DB1",
+    "ID": 123,
+    "NAME": "test1",
+    "P": "INPUT p parametr value 1"
+  },
+  {
+    "connection": "DB1",
+    "ID": 223,
+    "NAME": "test2",
+    "P": "INPUT p parametr value 2"
+  },
+  {
+    "connection": "DB1",
+    "ID": 323,
+    "NAME": "test3",
+    "P": "INPUT p parametr value 3"
+  }
+,
+  {
+    "connection": "DB1",
+    "ID": 423,
+    "NAME": "test4",
+    "P": "INPUT p parametr value 4"
   }
 ]
