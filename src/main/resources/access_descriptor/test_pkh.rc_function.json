@@ -1,0 +1,27 @@
+{
+  "alias": {
+
+    "callable-statements": {
+      "db-sp-name": "call ? = test_pkh.rc_function(?)",
+      "in-param": {
+        "param": [
+          {
+            "jdbc-param-name": "AN",
+            "jdbc-param-type": "VARCHAR",
+            "jdbc-param-index": 2,
+            "jdbc-param-default": " "
+          }
+        ]
+      },
+      "out-param": {
+        "param": [
+          {
+            "jdbc-param-name": "result",
+            "jdbc-param-type": "SYS_REFCURSOR",
+            "jdbc-param-index": 1
+          }
+        ]
+      }
+    }
+  }
+}

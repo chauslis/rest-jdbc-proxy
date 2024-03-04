@@ -25,7 +25,8 @@ INSERT INTO CUSTOMER (ID, FIRST_NAME, LAST_NAME) VALUES(10, 'Michelle', 'Dessler
 INSERT INTO CUSTOMER (ID, FIRST_NAME, LAST_NAME) VALUES(11, 'Jack', 'Bauer')
 /
 
-CREATE OR REPLACE PACKAGE test_pkh
+ALTER SESSION SET CURRENT_SCHEMA=GT;
+CREATE OR REPLACE PACKAGE GT.test_pkh
 AS
 
     PROCEDURE tst_proc;
@@ -35,9 +36,10 @@ AS
     FUNCTION tst_functionInt(aN NUMBER )
         return VARCHAR2;
     PROCEDURE proc_with_OutParam(Id NUMBER, Name VARCHAR2, out1 OUT VARCHAR2, OUT2 OUT VARCHAR2, OUT3 OUT VARCHAR2, p VARCHAR2);
+    FUNCTION rc_function(aN VARCHAR2  ) return SYS_REFCURSOR ;
 END;
 /
-CREATE OR REPLACE PACKAGE BODY test_pkh
+CREATE OR REPLACE PACKAGE BODY GT.test_pkh
 IS
 
     PROCEDURE tst_proc
@@ -72,6 +74,21 @@ IS
         out2 := Name;
         out3 := p;
     END;
+
+    FUNCTION rc_function(aN VARCHAR2  ) return SYS_REFCURSOR
+        IS
+        vResult SYS_REFCURSOR;
+    BEGIN
+        OPEN vResult FOR
+            SELECT 1 N, SYSDATE d, 'Line !' S FROM DUAL
+            UNION
+            SELECT 2 N, SYSDATE d, 'Line 2' S FROM DUAL
+            UNION
+            SELECT 3 N, SYSDATE d, 'Line 3' S FROM DUAL;
+
+        RETURN vResult;
+    END;
+
 
 END;
 /

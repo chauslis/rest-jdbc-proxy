@@ -46,7 +46,7 @@ POST http://localhost:8080/rjp/dynpst/prepared_statement
 Content-Type: application/json
 
 {
-  "connection": "DB2",
+  "connection": "DB1",
   "ID": 7
 }
 
@@ -62,6 +62,63 @@ Content-Type: application/json
   "P": "INPUT p parametr value"
 }
 
+###
+POST http://localhost:8080/rjp/dynpst/test_pkh.rc_function
+Content-Type: application/json
+
+{
+"connection": "DB1",
+"aN": "123"
+}
+
+###
+# curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "prepared_statement.json","ID": 7 }' http://localhost:8080/rjp/dynpst
+POST http://localhost:8080/rjp/batch/prepared_statement
+Content-Type: application/json
+
+[
+  {
+    "connection": "DB1",
+    "aN": "123"
+  },
+  {
+    "connection": "DB2",
+    "aN": "23"
+  },
+  {
+    "connection": "DB3",
+    "aN": "3"
+  },
+  {
+    "connection": "DB1",
+    "aN": "321"
+  }
+]
+
+
+
+###
+POST http://localhost:8080/rjp/batch/test_pkh.rc_function
+Content-Type: application/json
+
+[
+  {
+    "connection": "DB1",
+    "aN": "123"
+  },
+  {
+    "connection": "DB2",
+    "aN": "23"
+  },
+  {
+    "connection": "DB3",
+    "aN": "3"
+  },
+  {
+    "connection": "DB1",
+    "aN": "321"
+  }
+]
 
 ###
 POST http://localhost:8080/rjp/batch/test_pkh.tst_function
@@ -187,3 +244,5 @@ Content-Type: application/json
     "P": "INPUT p parametr value 4"
   }
 ]
+
+
