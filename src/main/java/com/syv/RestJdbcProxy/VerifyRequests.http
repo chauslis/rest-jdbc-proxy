@@ -12,23 +12,9 @@
 #--WebAppBoundary--
 #
 #
-####
-#GET http://localhost:8080/rjp/dynamic?connection=DB1&procName=test_pkh.tst_function.json&aN=123
-#Accept: application/json
 
 ###
 GET http://localhost:8080/rjp/query?connection=DB1&sqlQuery=select%20*%20from%20customer%20where%20id%3C800
-
-###
-# curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "test_pkh.tst_function.json","aN": "123" }' http://localhost:8080/rjp/dynpst
-POST http://localhost:8080/rjp/dynpst/test_pkh.tst_function
-Content-Type: application/json
-
-{
-  "connection": "DB1",
-  "procName": "test_pkh.tst_function",
-  "aN": "123"
-}
 
 ###
 # curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "test_pkh.tst_function.json","aN": "123" }' http://localhost:8080/rjp/dynpst
@@ -176,13 +162,13 @@ Content-Type: application/json
   "P": "INPUT p parametr value 1"
 },
   {
-    "connection": "DB1",
+    "connection": "DB2",
     "ID": 223,
     "NAME": "test2",
     "P": "INPUT p parametr value 2"
   },
   {
-    "connection": "DB1",
+    "connection": "DB3",
     "ID": 323,
     "NAME": "test3",
     "P": "INPUT p parametr value 3"
@@ -244,5 +230,154 @@ Content-Type: application/json
     "P": "INPUT p parametr value 4"
   }
 ]
+
+###
+POST https://njtransfer.org/artweb/listeqs.cgi?OC+BB
+Content-Type: application/json
+
+{
+    "doSearch": "Search"
+}
+##################################################
+################## async
+
+###
+POST http://localhost:8080/rjp/startAsyncTaskTest
+###
+GET http://localhost:8080/rjp/taskResult/c5c39ba8-e113-4da1-abcd-92ae70283ade
+###
+GET http://localhost:8080/rjp/tasksStatus
+###
+GET http://localhost:8080/rjp/taskStatus/b6d83f2d-4975-451c-be46-8c1a7eff3111
+###
+GET http://localhost:8080/rjp/taskRemove/0672aede-335e-48fb-b2a6-85ef2ce4efd0
+
+###
+POST http://localhost:8080/rjp/startAsyncTask/test_pkh.tst_function
+Content-Type: application/json
+
+[
+  {"connection": "DB1",
+    "aN": "123"
+  },
+  {"connection": "DB2",
+    "aN": "23"
+  },
+  {"connection": "DB1",
+    "aN": "3"
+  },
+  {"connection": "DB1",
+    "aN": "321"
+  }
+]
+
+###
+POST http://localhost:8080/rjp/startAsyncTask/test_pkh.proc_with_OutParam
+Content-Type: application/json
+
+[
+  {
+    "connection": "DB1",
+    "ID": 123,
+    "NAME": "test1",
+    "P": "INPUT p parametr value 1"
+  },
+  {
+    "connection": "DB1",
+    "ID": 223,
+    "NAME": "test2",
+    "P": "INPUT p parametr value 2"
+  },
+  {
+    "connection": "DB1",
+    "ID": 323,
+    "NAME": "test3",
+    "P": "INPUT p parametr value 3"
+  },
+  {
+    "connection": "DB1",
+    "ID": 423,
+    "NAME": "test4",
+    "P": "INPUT p parametr value 4"
+  },
+  {
+    "connection": "DB1",
+    "ID": 123,
+    "NAME": "test1",
+    "P": "INPUT p parametr value 1"
+  },
+  {
+    "connection": "DB2",
+    "ID": 223,
+    "NAME": "test2",
+    "P": "INPUT p parametr value 2"
+  },
+  {
+    "connection": "DB3",
+    "ID": 323,
+    "NAME": "test3",
+    "P": "INPUT p parametr value 3"
+  }
+,
+  {
+    "connection": "DB1",
+    "ID": 423,
+    "NAME": "test4",
+    "P": "INPUT p parametr value 4"
+  },
+  {
+    "connection": "DB1",
+    "ID": 123,
+    "NAME": "test1",
+    "P": "INPUT p parametr value 1"
+  },
+  {
+    "connection": "DB1",
+    "ID": 223,
+    "NAME": "test2",
+    "P": "INPUT p parametr value 2"
+  },
+  {
+    "connection": "DB1",
+    "ID": 323,
+    "NAME": "test3",
+    "P": "INPUT p parametr value 3"
+  },
+  {
+    "connection": "DB1",
+    "ID": 423,
+    "NAME": "test4",
+    "P": "INPUT p parametr value 4"
+  },
+  {
+    "connection": "DB1",
+    "ID": 123,
+    "NAME": "test1",
+    "P": "INPUT p parametr value 1"
+  },
+  {
+    "connection": "DB1",
+    "ID": 223,
+    "NAME": "test2",
+    "P": "INPUT p parametr value 2"
+  },
+  {
+    "connection": "DB1",
+    "ID": 323,
+    "NAME": "test3",
+    "P": "INPUT p parametr value 3"
+  }
+,
+  {
+    "connection": "DB1",
+    "ID": 423,
+    "NAME": "test4",
+    "P": "INPUT p parametr value 4"
+  }
+]
+
+### nsed to fix
+##GET http://localhost:8080/rjp/startAsyncTask/query?connection=DB1&sqlQuery=select%20*%20from%20customer%20where%20id%3C800
+
 
 

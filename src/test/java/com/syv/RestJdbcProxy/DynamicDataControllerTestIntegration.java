@@ -41,16 +41,21 @@ public class DynamicDataControllerTestIntegration {
     @Autowired
     private MockMvc mockMvc;
 
-//    @MockBean
-//    private DynamicDataService dynamicDataService;
 
-    static ArrayList<OracleContainer> oracleArrayList = new  ArrayList<>(Arrays.asList(new  OracleContainer(), new  OracleContainer(), new  OracleContainer()));
+
+    static ArrayList<OracleContainer> oracleArrayList = new  ArrayList<>(Arrays.asList(
+            //new  OracleContainer(),
+            //new  OracleContainer(),
+            new  OracleContainer()));
     private static final Logger log = LoggerFactory.getLogger(DynamicDataControllerTestIntegration.class);
 
     @BeforeAll
     public static void setUp() {
         System.out.println("Run BeforeAll");
-        oracleArrayList.stream().parallel().forEach(oracleContainer -> {
+        oracleArrayList
+                .stream()
+                .parallel()
+                .forEach(oracleContainer -> {
             oracleContainer.start();
             //  log.info("Started Oracle");
         });
