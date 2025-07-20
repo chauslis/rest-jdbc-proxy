@@ -63,8 +63,7 @@ public class DynamicDataSourceConfig {
             // config.setDriverClassName("org.postgresql.Driver");
             config.setJdbcUrl(entry.getValue());
             //todo: add min/max pool size paramets
-             config.setMaximumPoolSize(20);
-            // config.setDriverClassName("org.postgresql.Driver");
+             config.setMaximumPoolSize(100);            // config.setDriverClassName("org.postgresql.Driver");
             dataSources.put(entry.getKey(), new HikariDataSource(config));
         }
         return dataSources;
