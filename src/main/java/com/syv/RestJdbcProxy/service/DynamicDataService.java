@@ -58,7 +58,7 @@ public class DynamicDataService {
     }
 
 
-    @Async
+    @Async("taskExecutor")
     public CompletableFuture<List<Map<String, Object>>> setTaskEecuteStoredPreocWithDynamicParams(String catalog, String storedProcName, Map<String, String> formalInParams, List<Map<String, Object>> inParams, Map<String, String> formalOutParams) {//tbd add batch of outParams
 
         CompletableFuture<List<Map<String, Object>>> future = CompletableFuture.supplyAsync(() -> {

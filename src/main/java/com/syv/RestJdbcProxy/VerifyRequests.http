@@ -244,11 +244,11 @@ Content-Type: application/json
 ###
 POST http://localhost:8080/rjp/startAsyncTaskTest
 ###
-GET http://localhost:8080/rjp/taskResult/c5c39ba8-e113-4da1-abcd-92ae70283ade
+GET http://localhost:8080/rjp/taskResult/a0219e47-6d03-4105-af73-71937bcc30d2
 ###
 GET http://localhost:8080/rjp/tasksStatus
 ###
-GET http://localhost:8080/rjp/taskStatus/b6d83f2d-4975-451c-be46-8c1a7eff3111
+GET http://localhost:8080/rjp/taskStatus/a0219e47-6d03-4105-af73-71937bcc30d2
 ###
 GET http://localhost:8080/rjp/taskRemove/0672aede-335e-48fb-b2a6-85ef2ce4efd0
 
@@ -379,5 +379,8 @@ Content-Type: application/json
 ### nsed to fix
 ##GET http://localhost:8080/rjp/startAsyncTask/query?connection=DB1&sqlQuery=select%20*%20from%20customer%20where%20id%3C800
 
+### Actuator example
+###curl -s http://localhost:8080/rjp/actuator/metrics | grep http.requests
 
+GET http://localhost:8080/rjp/actuator/metrics/http.requests.count
 

@@ -29,10 +29,9 @@ public class AsyncService {
   //  @Autowired
     private final Map<String,CompletableFuture<  ResponseEntity<List<Map<String, Object>>>>>  tasks = new ConcurrentHashMap<>();
 
-    @Async
+    @Async("taskExecutor")
     public CompletableFuture<  ResponseEntity<List<Map<String, Object>>>> processAsyncTest1(String taskId) {
         // Simulate a long-running task
-
 
         return tasks.put(taskId,  CompletableFuture.supplyAsync(() -> {
                 ResponseEntity<List<Map<String, Object>>> result = null;
@@ -51,9 +50,6 @@ public class AsyncService {
                 }
             )
         );
-
-
-
     }
 
     public ResponseEntity<List<Map<String, Object>>> getTaskResult(String taskId) {
@@ -98,7 +94,7 @@ public class AsyncService {
             );
         return status;
     }
-    @Async
+    @Async("taskExecutor")
     public  void processAsync(String taskId, DynamicDataService dynamicDataService,  String aliasName, List<Map<String, Object>> parameters) {
         tasks.put(taskId,  CompletableFuture.supplyAsync(() -> {
                     ResponseEntity<List<Map<String, Object>>> result = null;

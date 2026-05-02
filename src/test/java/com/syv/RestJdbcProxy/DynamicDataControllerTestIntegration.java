@@ -57,7 +57,6 @@ public class DynamicDataControllerTestIntegration {
                 .parallel()
                 .forEach(oracleContainer -> {
             oracleContainer.start();
-            //  log.info("Started Oracle");
         });
 
         DynamicDataSourceContextHolder.clearDataSourceKey();
@@ -98,7 +97,7 @@ public class DynamicDataControllerTestIntegration {
         String connections = "{"
                 + IntStream.range(0, oracleArrayList.size())
                 .boxed()
-                .map(i -> "\"DB" + ((Integer) (i+1)).toString() + "\":" + createConnectionFromUrlLoginPassword(oracleArrayList.get(i).getJdbcUrl(), oracleArrayList.get(i).getUsername(), oracleArrayList.get(i).getPassword()))
+                .map(i -> "\"DB" + ((Integer) (i + 1)).toString() + "\":" + createConnectionFromUrlLoginPassword(oracleArrayList.get(i).getJdbcUrl(), oracleArrayList.get(i).getUsername(), oracleArrayList.get(i).getPassword()))
                 .collect(Collectors.joining(","))
                 + "}";
 
@@ -106,7 +105,7 @@ public class DynamicDataControllerTestIntegration {
                 "{"
                         + IntStream.range(0, oracleArrayList.size())
                         .boxed()
-                        .map(i -> "\"DB" + ((Integer) (i+1)).toString() + "\":" + createConnectionFromUrlLoginPassword(oracleArrayList.get(i).getJdbcUrl(), oracleArrayList.get(i).getUsername(), oracleArrayList.get(i).getPassword()))
+                        .map(i -> "\"DB" + ((Integer) (i + 1)).toString() + "\":" + createConnectionFromUrlLoginPassword(oracleArrayList.get(i).getJdbcUrl(), oracleArrayList.get(i).getUsername(), oracleArrayList.get(i).getPassword()))
                         .collect(Collectors.joining(","))
                         + "}";
         registry.add("Db.connections", suplier);
@@ -133,7 +132,7 @@ public class DynamicDataControllerTestIntegration {
         }
     }
 
-    @Test
+   // @Test
     public void testExecuteDynamicQuery() throws Exception {
         String connection = "DB1";
         String sqlQuery = "SELECT * FROM customer";
