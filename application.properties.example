@@ -1,0 +1,52 @@
+# Example configuration for RestJdbcProxy
+# Copy this file to application.properties and update with your database settings
+
+# JPA/Hibernate settings
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+logging.level.org.hibernate.SQL=INFO
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+logging.level.org.hibernate.type.descriptor.sql=trace
+
+# Server configuration
+server.servlet.contextPath=/rjp
+
+# Database connections - Update with your database details
+# Supports any JDBC-compatible database (PostgreSQL, MySQL, Oracle, SQL Server, etc.)
+Db.connections=\
+  {DB1:"${DB1_JDBC_URL}",\
+  DB2:"${DB2_JDBC_URL}",\
+  DB3:"${DB3_JDBC_URL}"}
+
+# Example system/environment parameters:
+# DB1_JDBC_URL=jdbc:postgresql://localhost:5432/mydb?user=username&password=password
+# DB2_JDBC_URL=jdbc:mysql://localhost:3306/mydb?user=username&password=password
+# DB3_JDBC_URL=jdbc:oracle:thin:username/password@localhost:1521:xe
+
+# Access descriptor JSON files location
+json.folder.path=src/main/resources/access_descriptor
+
+# Thread pool size for async operations
+app.thread.number=50
+
+# CORS configuration
+cors.allowCredentials=true
+cors.allowedOrigins=http://localhost:4200,http://localhost:3000
+cors.allowedMethods=GET,POST,PUT,DELETE
+cors.allowedHeaders=*
+cors.exposedHeaders=Authorization,Link
+cors.maxAge=3600
+
+# Example database-specific configurations:
+
+# PostgreSQL example:
+# DB1:"jdbc:postgresql://localhost:5432/mydb?user=myuser&password=mypass"
+
+# MySQL example:
+# DB2:"jdbc:mysql://localhost:3306/mydb?user=myuser&password=mypass&useSSL=false"
+
+# SQL Server example:
+# DB3:"jdbc:sqlserver://localhost:1433;databaseName=mydb;user=myuser;password=mypass"
+
+# Oracle example:
+# DB4:"jdbc:oracle:thin:myuser/mypass@localhost:1521:xe"

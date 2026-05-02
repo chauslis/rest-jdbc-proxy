@@ -5,10 +5,6 @@ logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
 logging.level.org.hibernate.type.descriptor.sql=trace
 
 server.servlet.contextPath=/rjp
-#actuator configuration
-management.security.enabled=false
-security.basic.enabled=false
-management.endpoints.web.exposure.include=*
 
 
 Db.connections=\
@@ -19,6 +15,7 @@ Db.connections=\
 json.folder.path=src/main/resources/access_descriptor
 
 app.thread.number=50
+
 
 # Enable CORS
 cors.allowCredentials=true
