@@ -30,8 +30,14 @@ public class DynamicDataSourceConfig {
     @Value("#{${Db.connections}}")
     private Map<String,String> connections;
 
-    @Value("${app.thread.number}")
-    public  int ThreadNumber;
+    @Value("${app.datasource.maximum-pool-size:10}")
+    private int maximumPoolSize;
+
+    @Value("${app.async.max-threads-per-db:10}")
+    private int maxThreadsPerDb;
+
+    @Value("${app.async.max-threads-total:100}")
+    private int maxThreadsTotal;
 
     private String[] parseConnString(String connectionString) {
         String[] result = new String[3];
@@ -62,8 +68,7 @@ public class DynamicDataSourceConfig {
             //todo: add driverClassName into parameters
             // config.setDriverClassName("org.postgresql.Driver");
             config.setJdbcUrl(entry.getValue());
-            //todo: add min/max pool size paramets
-             config.setMaximumPoolSize(100);            // config.setDriverClassName("org.postgresql.Driver");
+            config.setMaximumPoolSize(maximumPoolSize);
             dataSources.put(entry.getKey(), new HikariDataSource(config));
         }
         return dataSources;
@@ -106,8 +111,17 @@ public class DynamicDataSourceConfig {
 
     @Bean
     public ExecutorService executorService() {
-
-        return Executors.newFixedThreadPool(ThreadNumber); // Customize as needed
-    }
+        return Executors.newFixedThreadPool(resolveTotalThreadCount());
     }
 
+    @Bean
+    public Integer totalThreadCount() {
+        return resolveTotalThreadCount();
+    }
+
+    private int resolveTotalThreadCount() {
+        int dbCount = Math.max(1, connections.size());
+        int calculatedThreads = dbCount * maxThreadsPerDb;
+        return Math.max(1, Math.min(calculatedThreads, maxThreadsTotal));
+    }
+    }

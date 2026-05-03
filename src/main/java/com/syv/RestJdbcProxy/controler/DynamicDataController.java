@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 public class DynamicDataController {
 
     private static final Logger log = LoggerFactory.getLogger(DynamicDataController.class);
-    private static final int THREAD_NUMBER = 10;
 
     @Autowired
     private DynamicDataService dynamicDataService;

@@ -26,8 +26,12 @@ Db.connections=\
 # Access descriptor JSON files location
 json.folder.path=src/main/resources/access_descriptor
 
-# Thread pool size for async operations
-app.thread.number=50
+# Thread and connection pool limits
+app.datasource.maximum-pool-size=10
+app.async.max-threads-per-db=10
+app.async.max-threads-total=100
+app.async.queue-capacity=100
+app.batch.max-threads-per-request=10
 
 # CORS configuration
 cors.allowCredentials=true

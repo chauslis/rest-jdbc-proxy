@@ -7,6 +7,7 @@ import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,7 +43,9 @@ public class DynamicDataService {
     @Autowired
     ExecutorService executorService;
 
-    private static final int THREAD_NUMBER = 10;
+    @Value("${app.batch.max-threads-per-request:10}")
+    private int maxThreadsPerRequest;
+
     @Bean
     public DataSourceTransactionManager transactionManager(DataSource dynamicDataSource) {
         return new DataSourceTransactionManager(dynamicDataSource);
@@ -90,20 +93,28 @@ public class DynamicDataService {
 
     Stream<List<Map<String, Object>>> splitList2sublists(List<Map<String, Object>> list, int threadNumber) {
         List<List<Map<String, Object>>> sublists = new LinkedList<>();
-        int partitionSize = list.size() / threadNumber;
-        if (partitionSize < 1) {
-            partitionSize = 1;
-            threadNumber = 1;
+
+        if (list == null || list.isEmpty()) {
+            return sublists.stream();
         }
-        int end = 0;
-        for (int i = 0; i < threadNumber; i++) {
-            int start = i * partitionSize;
-            end = (i + 1) * partitionSize;
-            List<Map<String, Object>> partition = list.subList(start, end);
-            sublists.add(partition);
+
+        int partitionCount = Math.min(Math.max(1, threadNumber), list.size());
+        int basePartitionSize = list.size() / partitionCount;
+        int remainder = list.size() % partitionCount;
+
+        int start = 0;
+        for (int i = 0; i < partitionCount; i++) {
+            int partitionSize = basePartitionSize + (i < remainder ? 1 : 0);
+            int end = start + partitionSize;
+            sublists.add(list.subList(start, end));
+            start = end;
         }
-        if (end < list.size()) sublists.add(list.subList(end, list.size()));
+
         return sublists.stream();
+    }
+
+    private int resolveBatchThreadCount(int itemCount) {
+        return Math.max(1, Math.min(itemCount, maxThreadsPerRequest));
     }
 
     public List<Map<String, Object>> distributeAndExecuteSP(String catalog, String storedProcName, Map<String, String> formalInParams, List<Map<String, Object>> inParams, Map<String, String> formalOutParams, int numberOfThreads) throws ExecutionException, InterruptedException {
@@ -159,11 +170,16 @@ public class DynamicDataService {
 //            formalOutParams.remove("RESULT");
         } else simpleJdbcCall.withProcedureName(storedProcName);
 
-        formalOutParams.entrySet().stream().filter(param -> !param.getKey().toUpperCase().equals("RESULT")).forEach(param -> {
+        formalOutParams.entrySet()
+                .stream()
+                .filter(param -> !param.getKey().toUpperCase().equals("RESULT"))
+                .forEach(param -> {
             simpleJdbcCall.declareParameters(new SqlOutParameter(param.getKey().toUpperCase(), convertStringToJdbcType(param.getValue().toUpperCase())));
         });
 
-        formalInParams.entrySet().stream().forEach(param -> {
+        formalInParams.entrySet()
+                .stream()
+                .forEach(param -> {
             simpleJdbcCall.declareParameters(new SqlParameter(param.getKey().toUpperCase(), convertStringToJdbcType(param.getValue().toUpperCase())));
         });
         Object result = null;
@@ -214,7 +230,7 @@ public class DynamicDataService {
         String sqlStatementToPrepare = aliasConfig.getAlias().getPreparedStatementAlias().getSqlStatementToPrepare();
         List<List<Map<String, Object>>> outParams = new ArrayList<>();
         try {
-            outParams = distributeAndExecuteQuery(sqlStatementToPrepare, parameters, THREAD_NUMBER);
+            outParams = distributeAndExecuteQuery(sqlStatementToPrepare, parameters, resolveBatchThreadCount(parameters.size()));
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
@@ -268,11 +284,11 @@ public class DynamicDataService {
         Map<String, String> inParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getInParam().getParam()));
         Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getOutParam().getParam()));
 
-        String connection = (String) parameters.get(0).get("connection");//TBD add option work with different conne3ctions
+        String connection = (String) parameters.get(0).get("connection");//TBD add option work with different connections
         String spName = getSpName(aliasConfig);
         List<Map<String, Object>> outParams = new ArrayList<>();
         try {
-            outParams = distributeAndExecuteSP(getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamsDescr, THREAD_NUMBER);
+            outParams = distributeAndExecuteSP(getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamsDescr, resolveBatchThreadCount(parameters.size()));
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
