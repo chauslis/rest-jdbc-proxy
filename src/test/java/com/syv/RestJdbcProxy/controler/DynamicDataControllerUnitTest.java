@@ -1,7 +1,8 @@
 package com.syv.RestJdbcProxy.controler;
 
 import com.syv.RestJdbcProxy.config.DynamicDataSourceContextHolder;
-import com.syv.RestJdbcProxy.init.AliasConfig;
+import com.syv.RestJdbcProxy.dto.GatewayMetadata;
+import com.syv.RestJdbcProxy.dto.GatewayRequest;
 import com.syv.RestJdbcProxy.service.AsyncService;
 import com.syv.RestJdbcProxy.service.DynamicDataService;
 import org.junit.jupiter.api.AfterEach;
@@ -18,7 +19,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DynamicDataControllerUnitTest {
@@ -66,11 +66,11 @@ class DynamicDataControllerUnitTest {
 
     @Test
     void batchEndpointDelegatesToService() {
-        List<Map<String, Object>> parameters = List.of(Map.of("connection", "DB1"));
+        List<GatewayRequest> requests = List.of(gatewayRequest("DB1", Map.of("ID", 1)));
         ResponseEntity<List<Map<String, Object>>> expected = ResponseEntity.ok(List.of(Map.of("result", "ok")));
-        when(dynamicDataService.executeAliasBatch("alias", parameters)).thenReturn(expected);
+        when(dynamicDataService.executeAliasBatch("alias", requests)).thenReturn(expected);
 
-        assertEquals(expected, controller.executeAliasBatch("alias", parameters));
+        assertEquals(expected, controller.executeAliasBatch("alias", requests));
     }
 
     @Test
@@ -88,34 +88,33 @@ class DynamicDataControllerUnitTest {
 
     @Test
     void dynpstPreparedStatementDelegatesToQueryResponse() {
-        AliasConfig aliasConfig = preparedStatementAlias();
-        ReflectionTestUtils.setField(controller, "aliasConfigMap", Map.of("prepared", aliasConfig));
-        Map<String, Object> parameters = new java.util.HashMap<>(Map.of("connection", "DB1", "ID", 7));
+        GatewayRequest request = gatewayRequest("DB1", Map.of("ID", 7));
         ResponseEntity<List<Map<String, Object>>> expected = ResponseEntity.ok(List.of(Map.of("ID", 7)));
-        when(dynamicDataService.getResponseFromQuerySingle(parameters, aliasConfig)).thenReturn(expected);
+        when(dynamicDataService.executeAliasSingle("prepared", request)).thenReturn(expected);
 
-        assertEquals(expected, controller.executeAliasP("prepared", parameters));
-        verify(dynamicDataService).getResponseFromQuerySingle(parameters, aliasConfig);
+        assertEquals(expected, controller.executeAliasP("prepared", request));
     }
 
     @Test
     void dynpstMissingAliasReturnsNotFound() {
-        ReflectionTestUtils.setField(controller, "aliasConfigMap", Map.of());
-        Map<String, Object> parameters = new java.util.HashMap<>(Map.of("connection", "DB1", "ID", 7));
+        GatewayRequest request = gatewayRequest("DB1", Map.of("ID", 7));
+        when(dynamicDataService.executeAliasSingle("missing", request))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Alias not found: missing"));
 
         ResponseStatusException exception = assertThrows(
                 ResponseStatusException.class,
-                () -> controller.executeAliasP("missing", parameters)
+                () -> controller.executeAliasP("missing", request)
         );
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
     }
 
-    private static AliasConfig preparedStatementAlias() {
-        AliasConfig config = new AliasConfig();
-        AliasConfig.Alias alias = new AliasConfig.Alias();
-        alias.setPreparedStatementAlias(new AliasConfig.PreparedStatement());
-        config.setAlias(alias);
-        return config;
+    private static GatewayRequest gatewayRequest(String connectionName, Map<String, Object> params) {
+        GatewayMetadata metadata = new GatewayMetadata();
+        metadata.setConnectionName(connectionName);
+        GatewayRequest request = new GatewayRequest();
+        request.setRjp(metadata);
+        request.setParams(params);
+        return request;
     }
 }

@@ -45,8 +45,6 @@ public class DynamicDataControllerTestIntegration {
 
 
     static ArrayList<OracleContainer> oracleArrayList = new  ArrayList<>(Arrays.asList(
-            //new  OracleContainer(),
-            //new  OracleContainer(),
             new  OracleContainer()));
     private static final Logger log = LoggerFactory.getLogger(DynamicDataControllerTestIntegration.class);
 
@@ -64,7 +62,6 @@ public class DynamicDataControllerTestIntegration {
         oracleArrayList.stream().forEach(oracleContainer -> {
             log.info("Set DataSourceKey: {}", oracleContainer.getJdbcUrl());
             createTestUser(oracleContainer.getJdbcUrl(), oracleContainer.getUsername(), oracleContainer.getPassword());
-            //creteUserObjects(oracleContainer.getJdbcUrl(), "GT", "GT");
             creteUserObjects(oracleContainer.getJdbcUrl(), oracleContainer.getUsername(), oracleContainer.getPassword());
         });
 
@@ -77,8 +74,7 @@ public class DynamicDataControllerTestIntegration {
     }
     private static void createTestUser(String jdbcUrl, String username, String password) {
         final String DEFAULT_SYS_USER = "sys as sysdba";
-        try (//Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
-             Connection conn = DriverManager.getConnection(jdbcUrl, DEFAULT_SYS_USER, password);
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, DEFAULT_SYS_USER, password);
              Statement stmt = conn.createStatement()) {
 
 
@@ -150,8 +146,8 @@ public class DynamicDataControllerTestIntegration {
     @Test
     public void testExecuteDynPst() throws Exception {
         String jsonParametrs = "{\n" +
-                "  \"connection\": \"DB1\",\n" +
-                "  \"aN\": \"123\"\n" +
+                "  \"_rjp\": {\"connectionName\": \"DB1\"},\n" +
+                "  \"params\": {\"aN\": \"123\"}\n" +
                 "}\n";
         mockMvc.perform(post("/dynpst/test_pkh.tst_function")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -164,14 +160,13 @@ public class DynamicDataControllerTestIntegration {
                         .content(jsonParametrs))
                         .andExpect(status().isOk())
                         .andExpect(content().json(expectedJson));
-//                        .andExpect(jsonPath("result").value("1"));
     }
 
     @Test
     public void testExecutePreparedStatementAlias() throws Exception {
         String jsonParameters = "{\n" +
-                "  \"connection\": \"DB1\",\n" +
-                "  \"ID\": 7\n" +
+                "  \"_rjp\": {\"connectionName\": \"DB1\"},\n" +
+                "  \"params\": {\"AN\": 7}\n" +
                 "}\n";
 
         mockMvc.perform(post("/dynpst/prepared_statement")
@@ -180,16 +175,64 @@ public class DynamicDataControllerTestIntegration {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(6))
-                .andExpect(jsonPath("$[0].connection").value("DB1"));
+                .andExpect(jsonPath("$[0]._rjp_connectionName").value("DB1"));
+    }
+
+    @Test
+    public void testPreparedStatementAllowsBusinessConnectionParameter() throws Exception {
+        String jsonParameters = "{\n" +
+                "  \"_rjp\": {\"connectionName\": \"DB1\"},\n" +
+                "  \"params\": {\"connection\": \"business-value\", \"AN\": 7}\n" +
+                "}\n";
+
+        mockMvc.perform(post("/dynpst/prepared_statement")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonParameters))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(6))
+                .andExpect(jsonPath("$[0]._rjp_connectionName").value("DB1"));
+    }
+
+    @Test
+    public void testInvalidEnvelopeReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/dynpst/prepared_statement")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"params\":{\"AN\":7}}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/dynpst/prepared_statement")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"_rjp\":{},\"params\":{\"AN\":7}}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/dynpst/prepared_statement")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"_rjp\":{\"connectionName\":\"DB1\"}}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testMissingAliasReturnsNotFound() throws Exception {
+        String jsonParameters = "{\n" +
+                "  \"_rjp\": {\"connectionName\": \"DB1\"},\n" +
+                "  \"params\": {\"AN\": 7}\n" +
+                "}\n";
+
+        mockMvc.perform(post("/dynpst/missing_alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonParameters))
+                .andExpect(status().isNotFound());
     }
 
     @Test
     public void testExecuteStoredProcedureWithOutParams() throws Exception {
         String jsonParameters = "{\n" +
-                "  \"connection\": \"DB1\",\n" +
-                "  \"ID\": 123,\n" +
-                "  \"NAME\": \"test\",\n" +
-                "  \"P\": \"INPUT p parameter value\"\n" +
+                "  \"_rjp\": {\"connectionName\": \"DB1\"},\n" +
+                "  \"params\": {\n" +
+                "    \"ID\": 123,\n" +
+                "    \"NAME\": \"test\",\n" +
+                "    \"P\": \"INPUT p parameter value\"\n" +
+                "  }\n" +
                 "}\n";
 
         mockMvc.perform(post("/dynpst/test_pkh.proc_with_OutParam")
@@ -204,10 +247,10 @@ public class DynamicDataControllerTestIntegration {
     @Test
     public void testExecuteBatchStoredFunction() throws Exception {
         String jsonParameters = "[\n" +
-                "  {\"connection\": \"DB1\", \"aN\": \"123\"},\n" +
-                "  {\"connection\": \"DB1\", \"aN\": \"23\"},\n" +
-                "  {\"connection\": \"DB1\", \"aN\": \"3\"},\n" +
-                "  {\"connection\": \"DB1\", \"aN\": \"321\"}\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"aN\": \"123\"}},\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"aN\": \"23\"}},\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"aN\": \"3\"}},\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"aN\": \"321\"}}\n" +
                 "]\n";
 
         mockMvc.perform(post("/batch/test_pkh.tst_function")
@@ -224,8 +267,8 @@ public class DynamicDataControllerTestIntegration {
     @Test
     public void testExecuteBatchPreparedStatement() throws Exception {
         String jsonParameters = "[\n" +
-                "  {\"connection\": \"DB1\", \"aN\": 3},\n" +
-                "  {\"connection\": \"DB1\", \"aN\": 7}\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"AN\": 3}},\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"AN\": 7}}\n" +
                 "]\n";
 
         mockMvc.perform(post("/batch/prepared_statement")
@@ -238,10 +281,10 @@ public class DynamicDataControllerTestIntegration {
     @Test
     public void testAsyncBatchTaskLifecycle() throws Exception {
         String jsonParameters = "[\n" +
-                "  {\"connection\": \"DB1\", \"aN\": \"123\"},\n" +
-                "  {\"connection\": \"DB1\", \"aN\": \"23\"},\n" +
-                "  {\"connection\": \"DB1\", \"aN\": \"3\"},\n" +
-                "  {\"connection\": \"DB1\", \"aN\": \"321\"}\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"aN\": \"123\"}},\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"aN\": \"23\"}},\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"aN\": \"3\"}},\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"aN\": \"321\"}}\n" +
                 "]\n";
 
         MvcResult startResult = mockMvc.perform(post("/startAsyncTask/test_pkh.tst_function")

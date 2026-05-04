@@ -1,5 +1,7 @@
 package com.syv.RestJdbcProxy.service;
 
+import com.syv.RestJdbcProxy.dto.GatewayMetadata;
+import com.syv.RestJdbcProxy.dto.GatewayRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -32,17 +34,17 @@ class AsyncServiceTest {
 
     @Test
     void processAsyncStoresCompletedTaskAndReturnsResult() {
-        List<Map<String, Object>> parameters = List.of(Map.of("connection", "DB1", "id", 1));
+        List<GatewayRequest> requests = List.of(gatewayRequest("DB1", Map.of("id", 1)));
         ResponseEntity<List<Map<String, Object>>> expected =
                 new ResponseEntity<>(List.of(Map.of("result", "ok")), HttpStatus.OK);
-        when(dynamicDataService.executeAliasBatch("alias", parameters)).thenReturn(expected);
+        when(dynamicDataService.executeAliasBatch("alias", requests)).thenReturn(expected);
 
-        asyncService.processAsync("task-1", "alias", parameters);
+        asyncService.processAsync("task-1", "alias", requests);
 
         assertEquals(AsyncService.TASK_IS_COMPLETED, asyncService.getTaskStatus("task-1"));
         assertEquals(expected, asyncService.getTaskResult("task-1"));
         assertEquals(Map.of("task-1", AsyncService.TASK_IS_COMPLETED), asyncService.getTasksStatus());
-        verify(dynamicDataService).executeAliasBatch("alias", parameters);
+        verify(dynamicDataService).executeAliasBatch("alias", requests);
     }
 
     @Test
@@ -99,5 +101,14 @@ class AsyncServiceTest {
 
         assertEquals(0, asyncService.removeExpiredTasks());
         assertEquals(AsyncService.TASK_IS_COMPLETED, asyncService.getTaskStatus("completed"));
+    }
+
+    private static GatewayRequest gatewayRequest(String connectionName, Map<String, Object> params) {
+        GatewayMetadata metadata = new GatewayMetadata();
+        metadata.setConnectionName(connectionName);
+        GatewayRequest request = new GatewayRequest();
+        request.setRjp(metadata);
+        request.setParams(params);
+        return request;
     }
 }

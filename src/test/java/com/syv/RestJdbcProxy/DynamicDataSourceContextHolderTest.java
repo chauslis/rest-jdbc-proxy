@@ -33,13 +33,11 @@ class DynamicDataSourceContextHolderTest {
         assertNull(DynamicDataSourceContextHolder.getDataSourceKey(), "The data source key should be null after clear");
     }
 
-    // Optional: Test for thread isolation if needed
     @Test
     void testThreadIsolation() throws InterruptedException {
         String keyMain = "mainKey";
         String keyThread = "threadKey";
 
-        // Set key in main thread
         DynamicDataSourceContextHolder.setDataSourceKey(keyMain);
 
         Thread thread = new Thread(() -> {

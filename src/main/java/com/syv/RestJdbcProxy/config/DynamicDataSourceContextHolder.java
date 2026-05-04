@@ -3,7 +3,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-//@Slf4j
 public class DynamicDataSourceContextHolder {
     private static final Logger log = LoggerFactory.getLogger(DynamicDataSourceContextHolder.class);
     private static final ThreadLocal<String> contextHolder = new ThreadLocal<>();

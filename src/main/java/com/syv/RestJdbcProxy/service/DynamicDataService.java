@@ -1,8 +1,8 @@
 package com.syv.RestJdbcProxy.service;
 
-
 import com.syv.RestJdbcProxy.config.DynamicDataSourceContextHolder;
-import com.syv.RestJdbcProxy.init.AliasConfig;
+import com.syv.RestJdbcProxy.dto.GatewayRequest;
+import com.syv.RestJdbcProxy.init.OperationConfig;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,31 +14,34 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.SqlOutParameter;
 import org.springframework.jdbc.core.SqlParameter;
+import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Service;
-import org.springframework.jdbc.core.simple.SimpleJdbcCall;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 import java.sql.Types;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
 public class DynamicDataService {
     private static final Logger log = LoggerFactory.getLogger(DynamicDataService.class);
+    private static final String ROUTING_RESPONSE_FIELD = "_rjp_connectionName";
     private JdbcTemplate jdbcTemplate = new JdbcTemplate();
-    ;
 
     @Autowired
-    public Map<String, AliasConfig> aliasConfigMap;
+    public Map<String, OperationConfig> operationConfigMap;
 
     @Autowired
     ExecutorService executorService;
@@ -60,38 +63,54 @@ public class DynamicDataService {
         return jdbcTemplate.queryForList(sqlQuery);
     }
 
-
-    public CompletableFuture<List<Map<String, Object>>> setTaskEecuteStoredPreocWithDynamicParams(String catalog, String storedProcName, Map<String, String> formalInParams, List<Map<String, Object>> inParams, Map<String, String> formalOutParams) {//tbd add batch of outParams
-
-        CompletableFuture<List<Map<String, Object>>> future = CompletableFuture.supplyAsync(() -> {
-            return inParams.stream().map(param -> executeStoreFuncWithDynamicParams(catalog, storedProcName, formalInParams, param, formalOutParams)).collect(Collectors.toList());
-        }, executorService);
-
-        return future;
+    public CompletableFuture<List<Map<String, Object>>> setTaskEecuteStoredPreocWithDynamicParams(
+            String catalog,
+            String storedProcName,
+            List<OperationConfig.ParameterDescriptor> formalInParams,
+            List<GatewayRequest> requests,
+            List<OperationConfig.ParameterDescriptor> formalOutParams
+    ) {
+        return CompletableFuture.supplyAsync(
+                () -> requests.stream()
+                        .map(request -> executeStoreFuncWithDynamicParams(catalog, storedProcName, formalInParams, request, formalOutParams))
+                        .collect(Collectors.toList()),
+                executorService
+        );
     }
 
-    public CompletableFuture<List<List<Map<String, Object>>>> setTaskEecuteQueryDynamicParams(String sqlQuery, List<Map<String, Object>> inParams) {
-        return CompletableFuture.supplyAsync(() -> inParams.stream().map(param -> executeDynamicQuery(sqlQuery, param)).collect(Collectors.toList()), executorService);
+    public CompletableFuture<List<List<Map<String, Object>>>> setTaskEecuteQueryDynamicParams(
+            String sqlQuery,
+            List<GatewayRequest> requests,
+            List<OperationConfig.ParameterDescriptor> inputParameters
+    ) {
+        return CompletableFuture.supplyAsync(
+                () -> requests.stream()
+                        .map(request -> executeDynamicQuery(sqlQuery, request, inputParameters))
+                        .collect(Collectors.toList()),
+                executorService
+        );
     }
 
-    public List<List<Map<String, Object>>> distributeAndExecuteQuery(String sqlQuery, List<Map<String, Object>> inParams, int numberOfThreads) throws ExecutionException, InterruptedException {
-
+    public List<List<Map<String, Object>>> distributeAndExecuteQuery(
+            String sqlQuery,
+            List<GatewayRequest> requests,
+            List<OperationConfig.ParameterDescriptor> inputParameters,
+            int numberOfThreads
+    ) throws ExecutionException, InterruptedException {
         List<CompletableFuture<List<List<Map<String, Object>>>>> futureList = new LinkedList<>();
-        //distriobute parametr loist between thread
-        splitList2sublists(inParams, numberOfThreads).forEach(partition -> {
-            futureList.add(setTaskEecuteQueryDynamicParams(sqlQuery, partition));
-        });
+        splitList2sublists(requests, numberOfThreads).forEach(partition ->
+                futureList.add(setTaskEecuteQueryDynamicParams(sqlQuery, partition, inputParameters))
+        );
 
         CompletableFuture<Void> allFutures = CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0]));
-        CompletableFuture<List<List<List<Map<String, Object>>>>> allFutureResults = allFutures.thenApply(v -> futureList.stream().map(CompletableFuture::join) // Retrieves the result of the computation
+        CompletableFuture<List<List<List<Map<String, Object>>>>> allFutureResults = allFutures.thenApply(v -> futureList.stream()
+                .map(CompletableFuture::join)
                 .collect(Collectors.toList()));
-        List<List<Map<String, Object>>> results = allFutureResults.get().stream().flatMap(List::stream).collect(Collectors.toList());
-
-        return results;
+        return allFutureResults.get().stream().flatMap(List::stream).collect(Collectors.toList());
     }
 
-    Stream<List<Map<String, Object>>> splitList2sublists(List<Map<String, Object>> list, int threadNumber) {
-        List<List<Map<String, Object>>> sublists = new LinkedList<>();
+    <T> Stream<List<T>> splitList2sublists(List<T> list, int threadNumber) {
+        List<List<T>> sublists = new LinkedList<>();
 
         if (list == null || list.isEmpty()) {
             return sublists.stream();
@@ -116,133 +135,104 @@ public class DynamicDataService {
         return Math.max(1, Math.min(itemCount, maxThreadsPerRequest));
     }
 
-    public List<Map<String, Object>> distributeAndExecuteSP(String catalog, String storedProcName, Map<String, String> formalInParams, List<Map<String, Object>> inParams, Map<String, String> formalOutParams, int numberOfThreads) throws ExecutionException, InterruptedException {
-
+    public List<Map<String, Object>> distributeAndExecuteSP(
+            String catalog,
+            String storedProcName,
+            List<OperationConfig.ParameterDescriptor> formalInParams,
+            List<GatewayRequest> requests,
+            List<OperationConfig.ParameterDescriptor> formalOutParams,
+            int numberOfThreads
+    ) throws ExecutionException, InterruptedException {
         List<CompletableFuture<List<Map<String, Object>>>> futureList = new LinkedList<>();
-        // Retrieves the result of the computation
-        splitList2sublists(inParams, numberOfThreads).forEach(partition -> {
-            futureList.add(setTaskEecuteStoredPreocWithDynamicParams(catalog, storedProcName, formalInParams, partition, formalOutParams));
-        });
+        splitList2sublists(requests, numberOfThreads).forEach(partition ->
+                futureList.add(setTaskEecuteStoredPreocWithDynamicParams(catalog, storedProcName, formalInParams, partition, formalOutParams))
+        );
 
         CompletableFuture<Void> allFutures = CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0]));
-        CompletableFuture<List<List<Map<String, Object>>>> allFutureResults = allFutures
-                        .thenApply(v -> futureList.stream()
-                                    .map(CompletableFuture::join) // Retrieves the result of the computation
-                                    .collect(Collectors.toList()));
-        List<Map<String, Object>> results = allFutureResults
-                .get()
-                .stream()
-                .flatMap(List::stream)
-                .collect(Collectors.toList());
-
-        return results;
+        CompletableFuture<List<List<Map<String, Object>>>> allFutureResults = allFutures.thenApply(v -> futureList.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList()));
+        return allFutureResults.get().stream().flatMap(List::stream).collect(Collectors.toList());
     }
 
-    public List<Map<String, Object>> executeDynamicQuery(String sqlQuery, Map<String, Object> inParams) {
-        String connhection = inParams.get("connection").toString();
-        inParams.remove("connection");
-        DynamicDataSourceContextHolder.setDataSourceKey(connhection);
+    public List<Map<String, Object>> executeDynamicQuery(
+            String sqlQuery,
+            GatewayRequest request,
+            List<OperationConfig.ParameterDescriptor> inputParameters
+    ) {
+        String connectionName = connectionName(request);
+        Map<String, Object> params = params(request);
+        DynamicDataSourceContextHolder.setDataSourceKey(connectionName);
         try {
-            List<Object> parameters = inParams.entrySet().stream().map(param -> param.getValue()).collect(Collectors.toList());
-            List<Map<String, Object>> ret = jdbcTemplate.queryForList(sqlQuery, parameters.toArray());
-            return ret.stream().map(row -> {
-                row.put("connection", connhection);
-                return row;
+            Object[] jdbcParameters = buildJdbcParameters(params, inputParameters);
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sqlQuery, jdbcParameters);
+            return rows.stream().map(row -> {
+                Map<String, Object> rowCopy = new HashMap<>(row);
+                rowCopy.put(ROUTING_RESPONSE_FIELD, connectionName);
+                return rowCopy;
             }).collect(Collectors.toList());
         } finally {
             DynamicDataSourceContextHolder.clearDataSourceKey();
         }
-
     }
 
-    public Map<String, Object> executeDynamicQueryWithOutParams(String sqlQuery) {
-        return jdbcTemplate.queryForMap(sqlQuery);
-    }
-
-    //need to set dataSource before that function , In that case will be possible use annotation transactional
-    //  @Transactional
-    public Map<String, Object> executeStoreFuncWithDynamicParams(String catalog, String storedProcName, Map<String, String> formalInParams, Map<String, Object> inParams, Map<String, String> formalOutParams) {
+    public Map<String, Object> executeStoreFuncWithDynamicParams(
+            String catalog,
+            String storedProcName,
+            List<OperationConfig.ParameterDescriptor> formalInParams,
+            GatewayRequest request,
+            List<OperationConfig.ParameterDescriptor> formalOutParams
+    ) {
+        String connectionName = connectionName(request);
+        Map<String, Object> jdbcParams = jdbcParamsForCall(params(request), formalInParams);
         SimpleJdbcCall simpleJdbcCall = new SimpleJdbcCall(jdbcTemplate).withCatalogName(catalog);
 
-        DynamicDataSourceContextHolder.setDataSourceKey(inParams.get("connection").toString());
+        DynamicDataSourceContextHolder.setDataSourceKey(connectionName);
         try {
-            inParams.remove("connection");
-            String outParamsType = null;
-            Map<String, String> safeFormalOutParams = formalOutParams == null ? Map.of() : formalOutParams;
-            Map<String, String> safeFormalInParams = formalInParams == null ? Map.of() : formalInParams;
-            if (safeFormalOutParams.containsKey("RESULT")) {
+            OperationConfig.ParameterDescriptor resultParameter = resultParameter(formalOutParams);
+            if (resultParameter != null) {
                 simpleJdbcCall.withFunctionName(storedProcName);
-                outParamsType = safeFormalOutParams.get("RESULT");
-//            formalOutParams.remove("RESULT");
-            } else simpleJdbcCall.withProcedureName(storedProcName);
-
-            safeFormalOutParams.entrySet()
-                    .stream()
-                    .filter(param -> !param.getKey().toUpperCase().equals("RESULT"))
-                    .forEach(param -> {
-                        simpleJdbcCall.declareParameters(new SqlOutParameter(param.getKey().toUpperCase(), convertStringToJdbcType(param.getValue().toUpperCase())));
-                    });
-
-            safeFormalInParams.entrySet()
-                    .stream()
-                    .forEach(param -> {
-                        simpleJdbcCall.declareParameters(new SqlParameter(param.getKey().toUpperCase(), convertStringToJdbcType(param.getValue().toUpperCase())));
-                    });
-            Object result = null;
-            Map<String, Object> outParams;
-            if (outParamsType != null) {
-                int tType = convertStringToJdbcType(outParamsType);
-                Class<?> returnType = convertSqlTypeToJavaClass(tType);
-                outParams = new HashMap<>();
-                result = simpleJdbcCall.executeFunction(convertSqlTypeToJavaClass(tType), inParams);
-                log.debug("Result: {}", result);
-                outParams.put("result", result);// todo: support differnt out paranmetr function result
             } else {
-                outParams = simpleJdbcCall.execute(inParams);
+                simpleJdbcCall.withProcedureName(storedProcName);
             }
-            return outParams;
+
+            formalOutParams.stream()
+                    .filter(param -> !isResultParameter(param))
+                    .forEach(param -> simpleJdbcCall.declareParameters(
+                            new SqlOutParameter(param.getName().toUpperCase(), convertStringToJdbcType(param.getJdbcType().toUpperCase()))
+                    ));
+
+            formalInParams.forEach(param -> simpleJdbcCall.declareParameters(
+                    new SqlParameter(param.getName().toUpperCase(), convertStringToJdbcType(param.getJdbcType().toUpperCase()))
+            ));
+
+            if (resultParameter != null) {
+                int tType = convertStringToJdbcType(resultParameter.getJdbcType());
+                Object result = simpleJdbcCall.executeFunction(convertSqlTypeToJavaClass(tType), jdbcParams);
+                Map<String, Object> outParams = new HashMap<>();
+                outParams.put("result", result);
+                return outParams;
+            }
+            return simpleJdbcCall.execute(jdbcParams);
         } finally {
             DynamicDataSourceContextHolder.clearDataSourceKey();
         }
-
     }
 
-    @Transactional
-    public Map<String, Object> executeStoreFuncWithDynamicParams(String catalog, String storedProcName, Map<String, String> formalParams, Map<String, Object> inParams, String outParamsType) {
-        SimpleJdbcCall simpleJdbcCall = new SimpleJdbcCall(jdbcTemplate).withCatalogName(catalog)
-                //.withProcedureName(storedProcName)
-                .withFunctionName(storedProcName);
-
-        if (outParamsType != null) {
-            simpleJdbcCall.withFunctionName(storedProcName);
-            simpleJdbcCall.declareParameters(new SqlOutParameter("result", convertStringToJdbcType(outParamsType)));
-        } else simpleJdbcCall.withProcedureName(storedProcName);
-
-        formalParams.entrySet().stream().forEach(param -> {
-            simpleJdbcCall.declareParameters(new SqlParameter(param.getKey().toUpperCase(), convertStringToJdbcType(param.getValue().toUpperCase())));
-        });
-        Object result = null;
-        if (outParamsType != null) {
-            int tType = convertStringToJdbcType(outParamsType);
-            Class<?> returnType = convertSqlTypeToJavaClass(tType);
-            result = simpleJdbcCall.executeFunction(convertSqlTypeToJavaClass(tType), inParams);
-        } else {
-            simpleJdbcCall.execute(inParams);
-        }
-        Map<String, Object> outParams = new HashMap<>();
-        outParams.put("result", result);
-        return outParams;
-
-    }
-    public ResponseEntity<List<Map<String, Object>>> getResponseFromQuery(List<Map<String, Object>> parameters, AliasConfig aliasConfig) {
-
-        String sqlStatementToPrepare = aliasConfig.getAlias().getPreparedStatementAlias().getSqlStatementToPrepare();
-        List<List<Map<String, Object>>> outParams = new ArrayList<>();
+    public ResponseEntity<List<Map<String, Object>>> getResponseFromQuery(List<GatewayRequest> requests, OperationConfig operationConfig) {
+        OperationConfig.OperationDescriptor descriptor = operationConfig.getOperationDescriptor();
+        List<List<Map<String, Object>>> outParams;
         try {
-            outParams = distributeAndExecuteQuery(sqlStatementToPrepare, parameters, resolveBatchThreadCount(parameters.size()));
+            outParams = distributeAndExecuteQuery(
+                    descriptor.getSql(),
+                    requests,
+                    descriptor.getInputParameters(),
+                    resolveBatchThreadCount(requests.size())
+            );
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
 
@@ -250,97 +240,160 @@ public class DynamicDataService {
         log.debug("ResponseEntity result: {}", outParams);
         return new ResponseEntity<>(ret, HttpStatus.OK);
     }
-    public ResponseEntity<List<Map<String, Object>>> executeAliasBatch(String aliasName, List<Map<String, Object>> parameters) {
-        log.info("ResponseEntity parameters:  {}", parameters);
 
-        String procName = aliasName;//(String) parameters.get("procName");
-        if (parameters.contains("connection"))
-            parameters.remove("connectionconnection");
-        if (parameters.contains("procName"))
-            parameters.remove("procName");
+    public ResponseEntity<List<Map<String, Object>>> executeAliasBatch(String aliasName, List<GatewayRequest> requests) {
+        validateRequests(requests);
+        OperationConfig operationConfig = operationConfig(aliasName);
+        OperationConfig.OperationDescriptor descriptor = operationConfig.getOperationDescriptor();
 
-        AliasConfig aliasConfig = aliasConfigMap.get(aliasName);
-        if (aliasConfig == null || aliasConfig.getAlias() == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Alias not found: " + aliasName);
+        if (descriptor.getType() == OperationConfig.OperationType.PREPARED_STATEMENT) {
+            return getResponseFromQuery(requests, operationConfig);
         }
-        ResponseEntity<List<Map<String, Object>>> responseEntity;
-
-        // Iterate through each set of parameters and call the stored procedure
-        if (aliasConfig.getAlias().getPreparedStatementAlias() != null) {
-            responseEntity = getResponseFromQuery(parameters, aliasConfig);
-        } else {
-            responseEntity = getResponseFromBatchSP(parameters, aliasConfig);
-        }
-        return responseEntity;
+        return getResponseFromBatchSP(requests, operationConfig);
     }
-    private static String getSpName(AliasConfig aliasConfig) {
-        String spName;
-        String[] parts = aliasConfig.getAlias().getCallableStatements().getDbSpName().split("[\\s,()]+");
-        if (parts[0].toUpperCase().equals("CALL")) {
-            if (parts[1].toUpperCase().equals("?")) {
-                spName = parts[3];
-                String paramFromProc = parts[4];
-            } else {
-                spName = parts[1];
-                String paramFromProc = parts[2];
-            }
-        } else spName = parts[0];
-        return spName;
-    }
-    private String getSpName(String spName) {
-        String[] parts = spName.split("\\.");
-        return parts[1];
-    }
-    private ResponseEntity<List<Map<String, Object>>> getResponseFromBatchSP(List<Map<String, Object>> parameters, AliasConfig aliasConfig) {
 
-        Map<String, String> inParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getInParam().getParam()));
-        Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(getOutParams(aliasConfig)));
-
-        String connection = (String) parameters.get(0).get("connection");//TBD add option work with different connections
-        String spName = getSpName(aliasConfig);
-        List<Map<String, Object>> outParams = new ArrayList<>();
+    private ResponseEntity<List<Map<String, Object>>> getResponseFromBatchSP(List<GatewayRequest> requests, OperationConfig operationConfig) {
+        OperationConfig.OperationDescriptor descriptor = operationConfig.getOperationDescriptor();
+        String spName = descriptor.getDatabaseObjectName();
+        List<Map<String, Object>> outParams;
         try {
-            outParams = distributeAndExecuteSP(getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamsDescr, resolveBatchThreadCount(parameters.size()));
+            outParams = distributeAndExecuteSP(
+                    getPackagename(spName),
+                    getSpName(spName),
+                    descriptor.getInputParameters(),
+                    requests,
+                    descriptor.getOutputParameters(),
+                    resolveBatchThreadCount(requests.size())
+            );
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
 
         log.debug("ResponseEntity result: {}", outParams);
         return new ResponseEntity<>(outParams, HttpStatus.OK);
     }
-    public ResponseEntity<List<Map<String, Object>>> getResponseFromQuerySingle(Map<String, Object> parameters, AliasConfig aliasConfig) {
-        String sqlStatementToPrepare = aliasConfig.getAlias().getPreparedStatementAlias().getSqlStatementToPrepare();
-        List<Map<String, Object>> result = executeDynamicQuery(sqlStatementToPrepare, parameters);
+
+    public ResponseEntity<List<Map<String, Object>>> executeAliasSingle(String aliasName, GatewayRequest request) {
+        validateRequest(request);
+        OperationConfig operationConfig = operationConfig(aliasName);
+        OperationConfig.OperationDescriptor descriptor = operationConfig.getOperationDescriptor();
+
+        if (descriptor.getType() == OperationConfig.OperationType.PREPARED_STATEMENT) {
+            return getResponseFromQuerySingle(request, operationConfig);
+        }
+        return getResponseFromSP(request, operationConfig);
+    }
+
+    public ResponseEntity<List<Map<String, Object>>> getResponseFromQuerySingle(GatewayRequest request, OperationConfig operationConfig) {
+        OperationConfig.OperationDescriptor descriptor = operationConfig.getOperationDescriptor();
+        List<Map<String, Object>> result = executeDynamicQuery(descriptor.getSql(), request, descriptor.getInputParameters());
         log.info("ResponseEntity result: {}", result);
         return new ResponseEntity<>(result, HttpStatus.OK);
     }
 
-        public  ResponseEntity<List<Map<String, Object>>> getResponseFromSP(Map<String, Object> parameters, AliasConfig aliasConfig) {
-        Map<String, String> inParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getInParam().getParam()));
-        Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(getOutParams(aliasConfig)));
-
-        String spName = getSpName(aliasConfig);
-        Map<String, Object> outPartams = executeStoreFuncWithDynamicParams(getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamsDescr);
+    public ResponseEntity<List<Map<String, Object>>> getResponseFromSP(GatewayRequest request, OperationConfig operationConfig) {
+        OperationConfig.OperationDescriptor descriptor = operationConfig.getOperationDescriptor();
+        String spName = descriptor.getDatabaseObjectName();
+        Map<String, Object> outParams = executeStoreFuncWithDynamicParams(
+                getPackagename(spName),
+                getSpName(spName),
+                descriptor.getInputParameters(),
+                request,
+                descriptor.getOutputParameters()
+        );
 
         List<Map<String, Object>> out = new ArrayList<>();
-        out.add(outPartams);
+        out.add(outParams);
         log.debug("ResponseEntity result: {}", out);
         return new ResponseEntity<>(out, HttpStatus.OK);
     }
+
+    private OperationConfig operationConfig(String aliasName) {
+        OperationConfig operationConfig = operationConfigMap.get(aliasName);
+        if (operationConfig == null || operationConfig.getOperationDescriptor() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Alias not found: " + aliasName);
+        }
+        return operationConfig;
+    }
+
+    private void validateRequests(List<GatewayRequest> requests) {
+        if (requests == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must be a list");
+        }
+        requests.forEach(this::validateRequest);
+    }
+
+    private void validateRequest(GatewayRequest request) {
+        try {
+            connectionName(request);
+            params(request);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+        }
+    }
+
+    private String connectionName(GatewayRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Missing request body");
+        }
+        return request.requireConnectionName();
+    }
+
+    private Map<String, Object> params(GatewayRequest request) {
+        return request.requireParams();
+    }
+
+    private Object[] buildJdbcParameters(Map<String, Object> params, List<OperationConfig.ParameterDescriptor> inputParameters) {
+        if (inputParameters == null || inputParameters.isEmpty()) {
+            return params.values().toArray();
+        }
+        return inputParameters.stream()
+                .sorted(Comparator.comparing(param -> param.getPosition() == null ? Integer.MAX_VALUE : param.getPosition()))
+                .map(param -> parameterValue(params, param))
+                .toArray();
+    }
+
+    private Object parameterValue(Map<String, Object> params, OperationConfig.ParameterDescriptor parameterDescriptor) {
+        if (params.containsKey(parameterDescriptor.getName())) {
+            return params.get(parameterDescriptor.getName());
+        }
+        return params.entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase(parameterDescriptor.getName()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(parameterDescriptor.getDefaultValue());
+    }
+
+    private Map<String, Object> jdbcParamsForCall(Map<String, Object> params, List<OperationConfig.ParameterDescriptor> inputParameters) {
+        Map<String, Object> jdbcParams = new HashMap<>();
+        inputParameters.forEach(parameter -> jdbcParams.put(parameter.getName(), parameterValue(params, parameter)));
+        return jdbcParams;
+    }
+
+    private OperationConfig.ParameterDescriptor resultParameter(List<OperationConfig.ParameterDescriptor> outputParameters) {
+        return outputParameters.stream()
+                .filter(this::isResultParameter)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isResultParameter(OperationConfig.ParameterDescriptor parameter) {
+        return parameter.getName() != null && "RESULT".equalsIgnoreCase(parameter.getName());
+    }
+
+    private String getSpName(String spName) {
+        String[] parts = spName.split("\\.");
+        return parts[1];
+    }
+
     private String getPackagename(String spName) {
         String[] parts = spName.split("\\.");
         return parts[0];
     }
 
-    private List<AliasConfig.Param> getOutParams(AliasConfig aliasConfig) {
-        AliasConfig.CallableStatements callableStatements = aliasConfig.getAlias().getCallableStatements();
-        if (callableStatements == null || callableStatements.getOutParam() == null) {
-            return List.of();
-        }
-        return callableStatements.getOutParam().getParam();
-    }
     public static int convertStringToJdbcType(String jdbcTypeName) {
         switch (jdbcTypeName.toUpperCase()) {
             case "VARCHAR":
@@ -358,9 +411,8 @@ public class DynamicDataService {
         }
     }
 
-    public static Class<?> convertSqlTypeToJavaClass(int sqlType) {//java.sql.Type to javaType.class
-        int iType = Types.INTEGER;
-        switch (iType) {
+    public static Class<?> convertSqlTypeToJavaClass(int sqlType) {
+        switch (sqlType) {
             case Types.INTEGER:
                 return Integer.class;
             case Types.BIGINT:
@@ -396,37 +448,25 @@ public class DynamicDataService {
             case Types.BINARY:
             case Types.VARBINARY:
                 return byte[].class;
+            case Types.REF_CURSOR:
+                return Object.class;
             default:
-                return null; // Unknown SQL type
+                return null;
         }
     }
 
     @PreDestroy
     public void destroy() {
-        executorService.shutdown(); // Disable new tasks from being submitted
+        executorService.shutdown();
         try {
-            // Wait a while for existing tasks to terminate
             if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
-                executorService.shutdownNow(); // Cancel currently executing tasks
-                // Wait a while for tasks to respond to being cancelled
+                executorService.shutdownNow();
                 if (!executorService.awaitTermination(60, TimeUnit.SECONDS))
                     System.err.println("ExecutorService did not terminate");
             }
         } catch (InterruptedException ie) {
-            // (Re-)Cancel if current thread also interrupted
             executorService.shutdownNow();
-            // Preserve interrupt status
             Thread.currentThread().interrupt();
         }
-    }
-    private Map<String, String> convertParamList2Map(List<AliasConfig.Param> formalPrams) {
-        Map<String, String> formalPramsMap = new HashMap<>();
-        if (formalPrams == null) {
-            return formalPramsMap;
-        }
-        formalPrams.stream().forEach(param -> {
-            formalPramsMap.put(param.getJdbcParamName().toUpperCase(), param.getJdbcParamType().toUpperCase());
-        });
-        return formalPramsMap;
     }
 }

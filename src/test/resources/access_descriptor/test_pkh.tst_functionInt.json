@@ -1,26 +1,21 @@
 {
-  "alias": {
-    "callable-statements": {
-      "db-sp-name": "test_pkh.tst_functionInt",
-      "in-param": {
-        "param": [
-          {
-            "jdbc-param-name": "AN",
-            "jdbc-param-type": "INTEGER",
-            "jdbc-param-index": 2,
-            "jdbc-param-default": " "
-          }
-        ]
-      },
-      "out-param": {
-        "param": [
-          {
-            "jdbc-param-name": "result",
-            "jdbc-param-type": "INTEGER",
-            "jdbc-param-index": 1
-          }
-        ]
+  "operationDescriptor": {
+    "type": "CALLABLE_STATEMENT",
+    "databaseObjectName": "test_pkh.tst_functionInt",
+    "inputParameters": [
+      {
+        "name": "AN",
+        "jdbcType": "INTEGER",
+        "position": 1,
+        "defaultValue": " "
       }
-    }
+    ],
+    "outputParameters": [
+      {
+        "name": "RESULT",
+        "jdbcType": "INTEGER",
+        "position": 0
+      }
+    ]
   }
 }

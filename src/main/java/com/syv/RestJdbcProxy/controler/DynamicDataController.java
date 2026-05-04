@@ -3,8 +3,7 @@ package com.syv.RestJdbcProxy.controler;
 import com.syv.RestJdbcProxy.service.AsyncService;
 import com.syv.RestJdbcProxy.service.DynamicDataService;
 import com.syv.RestJdbcProxy.config.DynamicDataSourceContextHolder;
-import com.syv.RestJdbcProxy.init.AliasConfig;
-import oracle.jdbc.proxy.annotation.Post;
+import com.syv.RestJdbcProxy.dto.GatewayRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -29,37 +28,19 @@ public class DynamicDataController {
     @Autowired
     private DynamicDataService dynamicDataService;
 
-    @Autowired
-    public Map<String, AliasConfig> aliasConfigMap;
-
     @Value("${app.demo-mode:false}")
     private boolean demoMode;
 
 
     @RequestMapping(value = "/batch/{aliasName}/**")
-    public ResponseEntity<List<Map<String, Object>>> executeAliasBatch(@PathVariable String aliasName, @RequestBody List<Map<String, Object>> parameters) {
-        return dynamicDataService.executeAliasBatch(aliasName, parameters);
+    public ResponseEntity<List<Map<String, Object>>> executeAliasBatch(@PathVariable String aliasName, @RequestBody List<GatewayRequest> requests) {
+        return dynamicDataService.executeAliasBatch(aliasName, requests);
     }
 
     @RequestMapping(value = "/dynpst/{aliasName}/**", method = RequestMethod.POST)
-    public ResponseEntity<List<Map<String, Object>>> executeAliasP(@PathVariable String aliasName, @RequestBody Map<String, Object> parameters) {
-
-        log.info("ResponseEntity parameters: connection: {}", parameters);
-        String connection = (String) parameters.get("connection");
-        String procName = aliasName;//(String) parameters.get("procName");
-        parameters.remove("procName");
-
-        AliasConfig aliasConfig = aliasConfigMap.get(procName);
-        if (aliasConfig == null || aliasConfig.getAlias() == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Alias not found: " + procName);
-        }
-        ResponseEntity<List<Map<String, Object>>> responseEntity = null;
-        if (aliasConfig.getAlias().getPreparedStatementAlias() != null) {
-            responseEntity = dynamicDataService.getResponseFromQuerySingle(parameters, aliasConfig);
-        } else {
-            responseEntity = dynamicDataService.getResponseFromSP(parameters, aliasConfig);
-        }
-        return responseEntity;
+    public ResponseEntity<List<Map<String, Object>>> executeAliasP(@PathVariable String aliasName, @RequestBody GatewayRequest request) {
+        log.info("Gateway request received for alias: {}", aliasName);
+        return dynamicDataService.executeAliasSingle(aliasName, request);
     }
 
 
@@ -80,29 +61,13 @@ public class DynamicDataController {
         }
     }
 
-    private String getPackagename(String spName) {
-        String[] parts = spName.split("\\.");
-        return parts[0];
-    }
-
-    private String getSpName(String spName) {
-        String[] parts = spName.split("\\.");
-        return parts[1];
-    }
-///// Async Task
     @Autowired
     private AsyncService asyncService;
 
     @PostMapping("/startAsyncTask/{aliasName}/**")
-    public String startAsyncBatchTask(@PathVariable String aliasName, @RequestBody List<Map<String, Object>> parameters) {
+    public String startAsyncBatchTask(@PathVariable String aliasName, @RequestBody List<GatewayRequest> requests) {
         String taskId = UUID.randomUUID().toString();
-        // asyncService.processAsync(taskId);
-        //  return "Task submitted. Your task ID is: " + taskId;
-
-        asyncService.processAsync(taskId, aliasName,  parameters);
-
-  //      future.thenAccept(result -> System.out.println(result));
-
+        asyncService.processAsync(taskId, aliasName, requests);
         return taskId;
     }
     @GetMapping("/taskResult/{taskId}")
@@ -111,16 +76,16 @@ public class DynamicDataController {
         return responseEntity;
     }
 
-    @GetMapping("/taskStatus/{taskId}")//return task status
+    @GetMapping("/taskStatus/{taskId}")
     public String getTaskStatus(@PathVariable String taskId) {
         return asyncService.getTaskStatus(taskId);
     }
-    @GetMapping("/tasksStatus")//return task status
+    @GetMapping("/tasksStatus")
     public Map<String, String> getTasksStatus() {
         return asyncService.getTasksStatus();
     }
 
-    @GetMapping("/taskRemove/{taskId}")//remove task if done
+    @GetMapping("/taskRemove/{taskId}")
     public String getTaskRemove(@PathVariable String taskId) {
         return asyncService.setTaskRemve(taskId);
     }
@@ -129,13 +94,8 @@ public class DynamicDataController {
     @PostMapping("/startAsyncTaskTest")
     public String startAsyncTask() {
         String taskId = UUID.randomUUID().toString();
-        // asyncService.processAsync(taskId);
-        //  return "Task submitted. Your task ID is: " + taskId;
-
         CompletableFuture<  ResponseEntity<List<Map<String, Object>>>> future = asyncService.processAsyncTest1(taskId);
-
         future.thenAccept(result -> System.out.println(result));
-
         return "Task " + taskId + " started, check later for result.";
     }
 

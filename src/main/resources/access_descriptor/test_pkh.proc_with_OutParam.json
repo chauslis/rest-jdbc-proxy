@@ -1,48 +1,43 @@
 {
-  "alias": {
-    "callable-statements": {
-      "db-sp-name": "test_pkh.proc_with_OutParam",
-      "in-param": {
-        "param": [
-          {
-            "jdbc-param-name": "ID",
-            "jdbc-param-type": "BIGINT",
-            "jdbc-param-index": 1,
-            "jdbc-param-default": ""
-          },
-          {
-            "jdbc-param-name": "Name",
-            "jdbc-param-type": "VARCHAR",
-            "jdbc-param-index": 2,
-            "jdbc-param-default": ""
-          },
-          {
-            "jdbc-param-name": "p",
-            "jdbc-param-type": "VARCHAR",
-            "jdbc-param-index": 6,
-            "jdbc-param-default": ""
-          }
-        ]
+  "operationDescriptor": {
+    "type": "CALLABLE_STATEMENT",
+    "databaseObjectName": "test_pkh.proc_with_OutParam",
+    "inputParameters": [
+      {
+        "name": "ID",
+        "jdbcType": "BIGINT",
+        "position": 1,
+        "defaultValue": ""
       },
-      "out-param": {
-        "param": [
-          {
-            "jdbc-param-name": "out1",
-            "jdbc-param-type": "VARCHAR",
-            "jdbc-param-index": 3
-          },
-          {
-            "jdbc-param-name": "out2",
-            "jdbc-param-type": "VARCHAR",
-            "jdbc-param-index": 4
-          },
-          {
-            "jdbc-param-name": "out3",
-            "jdbc-param-type": "VARCHAR",
-            "jdbc-param-index": 5
-          }
-        ]
+      {
+        "name": "NAME",
+        "jdbcType": "VARCHAR",
+        "position": 2,
+        "defaultValue": ""
+      },
+      {
+        "name": "P",
+        "jdbcType": "VARCHAR",
+        "position": 6,
+        "defaultValue": ""
       }
-    }
+    ],
+    "outputParameters": [
+      {
+        "name": "OUT1",
+        "jdbcType": "VARCHAR",
+        "position": 3
+      },
+      {
+        "name": "OUT2",
+        "jdbcType": "VARCHAR",
+        "position": 4
+      },
+      {
+        "name": "OUT3",
+        "jdbcType": "VARCHAR",
+        "position": 5
+      }
+    ]
   }
 }

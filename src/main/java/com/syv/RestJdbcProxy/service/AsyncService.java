@@ -1,5 +1,6 @@
 package com.syv.RestJdbcProxy.service;
 
+import com.syv.RestJdbcProxy.dto.GatewayRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -34,8 +35,6 @@ public class AsyncService {
     private long taskTtlMillis;
 
     public CompletableFuture<  ResponseEntity<List<Map<String, Object>>>> processAsyncTest1(String taskId) {
-        // Simulate a long-running task
-
         CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future = CompletableFuture.supplyAsync(() -> {
             try {
                 Thread.sleep(30000);
@@ -61,7 +60,6 @@ public class AsyncService {
             throw new RuntimeException(e);
         }
     }
-//    @GetMapping("/taskSratus/{taskId}")
     public  String getTaskStatus(String taskId) {
         TaskRecord taskRecord = taskId == null ? null : tasks.get(taskId);
         if (taskRecord == null) {
@@ -98,9 +96,9 @@ public class AsyncService {
             );
         return status;
     }
-    public void processAsync(String taskId, String aliasName, List<Map<String, Object>> parameters) {
+    public void processAsync(String taskId, String aliasName, List<GatewayRequest> requests) {
         CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future = CompletableFuture.supplyAsync(
-                () -> dynamicDataService.executeAliasBatch(aliasName, parameters),
+                () -> dynamicDataService.executeAliasBatch(aliasName, requests),
                 executorService
         );
         putTask(taskId, future);

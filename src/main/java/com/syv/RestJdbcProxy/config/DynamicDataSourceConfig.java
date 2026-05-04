@@ -63,15 +63,13 @@ public class DynamicDataSourceConfig {
             String[] conn = parseConnString(entry.getValue());
             log.info (String.format("key: {%s}, value: {%s}", entry.getKey(), conn[0]+"/"+conn[1] + "://" + conn[2]));
             HikariConfig config = new HikariConfig();
-            //todo: add driverClassName into parameters
-            // config.setDriverClassName("org.postgresql.Driver");
             config.setJdbcUrl(entry.getValue());
             config.setMaximumPoolSize(maximumPoolSize);
             dataSources.put(entry.getKey(), new HikariDataSource(config));
         }
         return dataSources;
     }
-  //  @Bean
+
     public Map<String, DataSource> dataSources1() {
         Map<String, DataSource> dataSources = new HashMap<>();
         for (Map.Entry<String, String> entry : connections.entrySet()) {
@@ -82,7 +80,6 @@ public class DynamicDataSourceConfig {
             dataSource.setUrl(entry.getValue());
             dataSources.put(entry.getKey(), dataSource);
         }
-      //  datasources = dataSources;
         return dataSources;
     }
 
@@ -98,7 +95,7 @@ public class DynamicDataSourceConfig {
         };
         routingDataSource.setTargetDataSources(targetDataSources);
         routingDataSource.afterPropertiesSet();
-        DynamicDataSourceContextHolder.setDataSourceKey("DB1");//todo: remove hardcode: for initial datasource
+        DynamicDataSourceContextHolder.setDataSourceKey("DB1");
         return routingDataSource;
     }
 

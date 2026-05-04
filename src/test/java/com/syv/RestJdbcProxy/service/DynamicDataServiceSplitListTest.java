@@ -15,7 +15,7 @@ class DynamicDataServiceSplitListTest {
     @Test
     void returnsNoPartitionsForEmptyInput() {
         List<List<Map<String, Object>>> partitions = dynamicDataService
-                .splitList2sublists(List.of(), 10)
+                .splitList2sublists(List.<Map<String, Object>>of(), 10)
                 .toList();
 
         assertEquals(List.of(), partitions);

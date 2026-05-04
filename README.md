@@ -1,25 +1,93 @@
 # Adaptive SQL Execution Gateway
 
-Adaptive SQL Execution Gateway is a Spring Boot application that exposes a REST API for executing JDBC operations against one or more configured databases. It supports dynamic database routing, SQL queries, prepared statement aliases, stored procedures, stored functions, batch execution, and asynchronous task execution.
+Adaptive SQL Execution Gateway is a Spring Boot application that exposes a REST API for executing JDBC operations against one or more configured databases. It supports dynamic database routing, prepared statement aliases, stored procedures, stored functions, batch execution, and asynchronous task execution.
 
-The main use case is to submit one HTTP request that contains many database operation parameters. Each item can target a different configured database connection, and the service can process the dataset in parallel by splitting the input list into partitions.
+The main use case is to submit one HTTP request containing many database operation inputs. Each item can target a different configured database connection, and the service can process the dataset in parallel by splitting the input list into partitions.
 
-This makes the service useful for systems where data is distributed across shards, partitions, tenants, or legacy database instances, and where clients need one HTTP API instead of direct JDBC access to every database.
+This is useful for systems where data is distributed across shards, partitions, tenants, or legacy database instances, and where clients need one HTTP API instead of direct JDBC access to every database.
 
 ## Features
 
-- **Multi-Database Support**: Works with any JDBC-compatible database (PostgreSQL, MySQL, Oracle, SQL Server, etc.)
-- **Dynamic Connection Switching**: Switch between multiple database connections at runtime
-- **REST API**: Clean RESTful endpoints for database operations
-- **Stored Procedures & Functions**: Execute database stored procedures and functions
-- **Batch Operations**: Process multiple operations efficiently
-- **Parallel Batch Execution**: Split one input dataset into partitions and execute the partitions with a configured executor
-- **Mixed-Database Batch Requests**: Run one batch request across different database connections by setting `connection` per input item
-- **Asynchronous Execution**: Non-blocking database operations with task tracking
-- **Prepared Statements**: Parameterized query support for security
-- **CORS Support**: Web application integration ready
+- **Multi-Database Support**: Works with JDBC-compatible databases such as Oracle, PostgreSQL, MySQL, SQL Server, and others
+- **Explicit Request Envelope**: Separates gateway routing metadata from JDBC/business parameters
+- **Dynamic Connection Switching**: Routes every request item by `_rjp.connectionName`
+- **Prepared Statements**: Executes parameterized SQL through descriptor aliases
+- **Stored Procedures and Functions**: Exposes database packages, procedures, and functions as REST endpoints
+- **Batch Operations**: Processes multiple request items in one call
+- **Parallel Batch Execution**: Splits one input dataset into partitions and executes those partitions with a configured executor
+- **Mixed-Database Batch Requests**: Runs one batch across different database connections by setting `_rjp.connectionName` per item
+- **Asynchronous Execution**: Starts long-running batch work and tracks task status/results
+- **Demo Raw SQL Endpoint**: Optional diagnostic `/query` endpoint controlled by `app.demo-mode`
 - **Request Metrics**: Micrometer request counters tagged by method, normalized URI, and status
 - **Coverage Gate**: JaCoCo verification with a minimum 70% instruction coverage threshold
+
+## Request Contract
+
+Gateway metadata and JDBC parameters are intentionally separated.
+
+Single request:
+
+```json
+{
+  "_rjp": {
+    "connectionName": "DB1"
+  },
+  "params": {
+    "ID": 123,
+    "NAME": "test",
+    "P": "value"
+  }
+}
+```
+
+Batch request:
+
+```json
+[
+  {
+    "_rjp": {
+      "connectionName": "DB1"
+    },
+    "params": {
+      "ID": 123,
+      "NAME": "test1"
+    }
+  },
+  {
+    "_rjp": {
+      "connectionName": "DB2"
+    },
+    "params": {
+      "ID": 223,
+      "NAME": "test2"
+    }
+  }
+]
+```
+
+`_rjp` contains gateway metadata. `params` contains only JDBC/business parameters. Database routing uses only `_rjp.connectionName`; the service does not read a top-level `connection` field and does not remove `connection` from `params`.
+
+This avoids conflicts when a real database operation has parameters named `connection`, `result`, `alias`, `status`, or other names that could otherwise collide with gateway fields.
+
+Example with a business parameter named `connection`:
+
+```json
+{
+  "_rjp": {
+    "connectionName": "DB1"
+  },
+  "params": {
+    "connection": "business-value",
+    "ID": 123
+  }
+}
+```
+
+The request routes to `DB1`. The `params.connection` value remains a business parameter.
+
+Invalid envelopes, such as missing `_rjp`, missing `_rjp.connectionName`, or missing `params`, return `400 BAD_REQUEST`. Missing aliases return `404 NOT_FOUND`.
+
+Prepared statement result rows include `_rjp_connectionName` when the gateway adds routing context to the response. The service does not add a `connection` field to result rows.
 
 ## Use Cases
 
@@ -29,13 +97,22 @@ Adaptive SQL Execution Gateway can execute one logical request across many physi
 
 ```json
 [
-  { "connection": "DB_SHARD_01", "customerId": 1001 },
-  { "connection": "DB_SHARD_02", "customerId": 2204 },
-  { "connection": "DB_SHARD_03", "customerId": 3108 }
+  {
+    "_rjp": { "connectionName": "DB_SHARD_01" },
+    "params": { "customerId": 1001 }
+  },
+  {
+    "_rjp": { "connectionName": "DB_SHARD_02" },
+    "params": { "customerId": 2204 }
+  },
+  {
+    "_rjp": { "connectionName": "DB_SHARD_03" },
+    "params": { "customerId": 3108 }
+  }
 ]
 ```
 
-The service routes each item to the database named by `connection`. This is useful when the application layer owns shard lookup or when an upstream service already resolved the partition key.
+This is useful when the application layer owns shard lookup or when an upstream service already resolved the partition key.
 
 ### Tenant-Based Database Routing
 
@@ -43,9 +120,18 @@ In multi-tenant systems, each tenant can be mapped to a separate database connec
 
 ```json
 [
-  { "connection": "TENANT_A", "accountId": 10 },
-  { "connection": "TENANT_B", "accountId": 10 },
-  { "connection": "TENANT_C", "accountId": 10 }
+  {
+    "_rjp": { "connectionName": "TENANT_A" },
+    "params": { "accountId": 10 }
+  },
+  {
+    "_rjp": { "connectionName": "TENANT_B" },
+    "params": { "accountId": 10 }
+  },
+  {
+    "_rjp": { "connectionName": "TENANT_C" },
+    "params": { "accountId": 10 }
+  }
 ]
 ```
 
@@ -53,7 +139,7 @@ The same prepared statement or stored procedure alias can be executed against ea
 
 ### Legacy System Modernization
 
-Adaptive SQL Execution Gateway can expose existing database packages, procedures, functions, and prepared statements as HTTP endpoints. This helps modernization projects where legacy business logic remains in the database, but new services need REST access.
+The gateway can expose existing database packages, procedures, functions, and prepared statements as HTTP endpoints. This helps modernization projects where legacy business logic remains in the database, but new services need REST access.
 
 Typical modernization flow:
 
@@ -66,13 +152,7 @@ Typical modernization flow:
 
 Large input datasets can be sent in one batch request. The service splits the dataset into sublists and executes those sublists with the configured executor.
 
-This is useful for:
-
-- bulk validation
-- customer/account enrichment
-- parallel stored procedure execution
-- fan-out reads across database partitions
-- migration or reconciliation jobs
+This is useful for bulk validation, customer/account enrichment, fan-out reads across database partitions, parallel stored procedure execution, migration jobs, and reconciliation jobs.
 
 ## Setup
 
@@ -84,36 +164,25 @@ This is useful for:
 
 ### Quick Start
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd adaptive-sql-execution-gateway
-   ```
-
-2. **Configure your databases**
-   ```bash
-   cp application.properties.example application.properties
-   ```
-   Edit `application.properties` with your database connection details.
-
-3. **Build and run**
-   ```bash
-   ./gradlew bootRun
-   ```
+```bash
+git clone <repository-url>
+cd adaptive-sql-execution-gateway
+./gradlew bootRun
+```
 
 ### Database Configuration
 
-The application supports multiple database types. Configure connections in `application.properties`:
+Configure database connections in `application.properties` with JDBC URLs supplied by environment variables:
 
 ```properties
-# Multiple database examples
 Db.connections=\
   {DB1:"${DB1_JDBC_URL}",\
   DB2:"${DB2_JDBC_URL}",\
   DB3:"${DB3_JDBC_URL}"}
 ```
 
-**Supported Databases:**
+Supported JDBC URL examples:
+
 - PostgreSQL: `jdbc:postgresql://host:port/database?user=<user>&password=<password>`
 - MySQL: `jdbc:mysql://host:port/database?user=<user>&password=<password>`
 - Oracle: `jdbc:oracle:thin:<user>/<password>@host:port:sid`
@@ -121,11 +190,96 @@ Db.connections=\
 
 Store actual JDBC URLs in environment variables or a local `.db.env` file that is excluded from Git.
 
-Access descriptors for stored procedures and prepared statements are defined in JSON files in the `src/main/resources/access_descriptor` directory.
+## Descriptor Contract
 
-### Parallel Execution Configuration
+Access descriptors are JSON files under `src/main/resources/access_descriptor`. The descriptor file base name is the alias used in API paths.
 
-Parallel execution is controlled by configuration rather than hardcoded thread constants:
+Example:
+
+```text
+src/main/resources/access_descriptor/prepared_statement.json
+alias: prepared_statement
+endpoint: /rjp/dynpst/prepared_statement
+```
+
+Prepared statement descriptor:
+
+```json
+{
+  "operationDescriptor": {
+    "type": "PREPARED_STATEMENT",
+    "sql": "select * from customer where id <= ?",
+    "inputParameters": [
+      {
+        "name": "AN",
+        "jdbcType": "BIGINT",
+        "position": 1,
+        "defaultValue": 500
+      }
+    ]
+  }
+}
+```
+
+Callable statement descriptor:
+
+```json
+{
+  "operationDescriptor": {
+    "type": "CALLABLE_STATEMENT",
+    "databaseObjectName": "test_pkh.proc_with_OutParam",
+    "inputParameters": [
+      {
+        "name": "ID",
+        "jdbcType": "BIGINT",
+        "position": 1,
+        "defaultValue": ""
+      }
+    ],
+    "outputParameters": [
+      {
+        "name": "OUT1",
+        "jdbcType": "VARCHAR",
+        "position": 3
+      }
+    ]
+  }
+}
+```
+
+Stored functions are represented as `CALLABLE_STATEMENT` descriptors. If `outputParameters` contains a parameter named `RESULT` case-insensitively, the gateway calls the database object as a function.
+
+Function descriptor:
+
+```json
+{
+  "operationDescriptor": {
+    "type": "CALLABLE_STATEMENT",
+    "databaseObjectName": "test_pkh.tst_function",
+    "inputParameters": [
+      {
+        "name": "AN",
+        "jdbcType": "VARCHAR",
+        "position": 1,
+        "defaultValue": " "
+      }
+    ],
+    "outputParameters": [
+      {
+        "name": "RESULT",
+        "jdbcType": "VARCHAR",
+        "position": 0
+      }
+    ]
+  }
+}
+```
+
+Descriptor validation requires `operationDescriptor`, `type`, supported JDBC types, and non-negative positions. Prepared statements require `sql`; callable statements require `databaseObjectName`.
+
+## Parallel Execution Configuration
+
+Parallel execution is controlled by configuration:
 
 ```properties
 app.demo-mode=false
@@ -154,18 +308,16 @@ Example:
 
 This gives two levels of concurrency:
 
-1. **Across database connections**: rows in the same request can target `DB1`, `DB2`, `DB3`, etc. Each row carries its own `connection` value.
+1. **Across database connections**: rows in the same request can target `DB1`, `DB2`, `DB3`, etc. Each row carries its own `_rjp.connectionName`.
 2. **Within one database workload**: many rows for the same database are split into partitions and executed through the shared `ExecutorService`.
 
 Thread counts should be sized together with the JDBC pool and database capacity. For JDBC work, increasing thread count above the connection pool or database server capacity usually adds contention instead of throughput.
 
 Completed and cancelled async tasks are retained only for `app.async.task-ttl-ms`. A scheduled cleanup runs every `app.async.task-cleanup-interval-ms` and removes expired terminal tasks. Set `app.async.task-ttl-ms=-1` to disable automatic cleanup.
 
-`app.demo-mode` controls the raw SQL `/query` endpoint. It is disabled by default and should be enabled only for local demos or controlled diagnostics.
-
 ## API Endpoints
 
-### Raw SQL Queries
+### Raw SQL Query
 
 Raw SQL execution is a demo/diagnostic feature. It works only when demo mode is enabled:
 
@@ -173,110 +325,128 @@ Raw SQL execution is a demo/diagnostic feature. It works only when demo mode is 
 app.demo-mode=true
 ```
 
-```
+```text
 GET /rjp/query?connection=DB1&sqlQuery=SELECT * FROM users
 ```
 
-Production clients should prefer JSON aliases for prepared statements, stored procedures, and stored functions.
+This endpoint intentionally remains query-parameter based. Production clients should prefer JSON aliases for prepared statements, stored procedures, and stored functions.
 
-### Stored Procedures/Functions
+### Execute One Alias
 
-```
+```text
 POST /rjp/dynpst/{aliasName}
 ```
-With request body:
+
 ```json
 {
-  "connection": "DB1",
-  "param1": "value1",
-  "param2": "value2"
+  "_rjp": {
+    "connectionName": "DB1"
+  },
+  "params": {
+    "AN": 123
+  }
 }
 ```
 
-### Batch Operations
+### Execute Batch Alias
 
-```
+```text
 POST /rjp/batch/{aliasName}
 ```
-With request body containing a list of parameter maps.
-
-Each item in the list may specify a different database connection:
 
 ```json
 [
-  { "connection": "DB1", "ID": 1 },
-  { "connection": "DB2", "ID": 2 },
-  { "connection": "DB1", "ID": 3 },
-  { "connection": "DB3", "ID": 4 }
+  {
+    "_rjp": { "connectionName": "DB1" },
+    "params": { "ID": 1 }
+  },
+  {
+    "_rjp": { "connectionName": "DB2" },
+    "params": { "ID": 2 }
+  },
+  {
+    "_rjp": { "connectionName": "DB3" },
+    "params": { "ID": 3 }
+  }
 ]
 ```
 
-The service splits this list into partitions and executes the partitions in parallel. During execution, the dynamic data source context is set from each item's `connection` field before calling JDBC.
+The service splits the list into partitions and executes the partitions in parallel. During execution, the dynamic data source context is set from each item's `_rjp.connectionName` before calling JDBC.
 
-### Asynchronous Operations
+### Async Batch Alias
 
-```
+```text
 POST /rjp/startAsyncTask/{aliasName}
-```
-
-Check status:
-```
 GET /rjp/taskStatus/{taskId}
+GET /rjp/taskResult/{taskId}
+DELETE /rjp/task/{taskId}
 ```
 
-Get result:
+Start async task:
+
+```bash
+TASK_ID=$(curl -X POST http://localhost:8080/rjp/startAsyncTask/my_procedure \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "_rjp": { "connectionName": "DB1" },
+      "params": { "param1": "value1" }
+    }
+  ]')
 ```
-GET /rjp/taskResult/{taskId}
+
+Check status and result:
+
+```bash
+curl "http://localhost:8080/rjp/taskStatus/$TASK_ID"
+curl "http://localhost:8080/rjp/taskResult/$TASK_ID"
 ```
 
 ## Example Usage
 
-### Demo-Mode Raw SQL Query
-
-Requires:
-
-```properties
-app.demo-mode=true
-```
+Demo-mode raw SQL:
 
 ```bash
 curl "http://localhost:8080/rjp/query?connection=DB1&sqlQuery=SELECT * FROM employees"
 ```
 
-### Stored Procedure Call
+Prepared statement alias:
+
 ```bash
-curl -X POST http://localhost:8080/rjp/dynpst/my_procedure \
+curl -X POST http://localhost:8080/rjp/dynpst/prepared_statement \
   -H "Content-Type: application/json" \
   -d '{
-    "connection": "DB1",
-    "param1": "value1",
-    "param2": "value2"
+    "_rjp": { "connectionName": "DB1" },
+    "params": { "AN": 500 }
   }'
 ```
 
-### Batch Operation
+Stored procedure/function alias:
+
 ```bash
-curl -X POST http://localhost:8080/rjp/batch/my_procedure \
+curl -X POST http://localhost:8080/rjp/dynpst/test_pkh.tst_function \
   -H "Content-Type: application/json" \
-  -d '[
-    {"connection": "DB1", "param1": "value1"},
-    {"connection": "DB2", "param1": "value2"},
-    {"connection": "DB1", "param1": "value3"}
-  ]'
+  -d '{
+    "_rjp": { "connectionName": "DB1" },
+    "params": { "AN": "123" }
+  }'
 ```
 
-### Async Operation
+Mixed-database batch:
+
 ```bash
-# Start async task
-TASK_ID=$(curl -X POST http://localhost:8080/rjp/startAsyncTask/my_procedure \
+curl -X POST http://localhost:8080/rjp/batch/prepared_statement \
   -H "Content-Type: application/json" \
-  -d '[{"connection": "DB1", "param1": "value1"}]')
-
-# Check status
-curl "http://localhost:8080/rjp/taskStatus/$TASK_ID"
-
-# Get result
-curl "http://localhost:8080/rjp/taskResult/$TASK_ID"
+  -d '[
+    {
+      "_rjp": { "connectionName": "DB1" },
+      "params": { "AN": 3 }
+    },
+    {
+      "_rjp": { "connectionName": "DB2" },
+      "params": { "AN": 7 }
+    }
+  ]'
 ```
 
 ## Testing and Coverage
@@ -287,15 +457,7 @@ Run the full verification suite:
 ./gradlew check
 ```
 
-The suite includes:
-
-- Unit tests for dynamic data source context handling
-- Unit tests for dataset splitting and mixed-database batch parameters
-- Unit tests for async task status/result management
-- Unit tests for controller delegation and request metrics
-- Unit tests for alias descriptor loading
-- Oracle-backed integration tests using Testcontainers
-- JaCoCo coverage verification with a minimum 70% threshold
+The suite includes unit tests for request envelope validation, dynamic data source context handling, dataset splitting, mixed-database batch parameters, async task management, controller delegation, request metrics, descriptor loading, Oracle-backed integration tests using Testcontainers, and JaCoCo coverage verification.
 
 The HTML coverage report is generated at:
 
@@ -316,16 +478,8 @@ This keeps the threading model centralized:
 - controllers do not create threads
 - services submit partitioned JDBC work to the configured executor
 - async task tracking stores `CompletableFuture` instances by task ID
-- per-row database routing is driven by the `connection` field
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- per-item database routing is driven by `_rjp.connectionName`
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.

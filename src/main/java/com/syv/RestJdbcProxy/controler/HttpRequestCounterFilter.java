@@ -30,8 +30,8 @@ public class HttpRequestCounterFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
         String url = firstTwoSegmentsFast(request.getRequestURI());
         Tags tags = Tags.of(
-                "method", request.getMethod(),              // GET / POST
-                "uri", url, // bounded
+                "method", request.getMethod(),
+                "uri", url,
                 "status", String.valueOf(response.getStatus())
         );
 
@@ -47,17 +47,14 @@ public class HttpRequestCounterFilter extends OncePerRequestFilter {
 
         int firstSlash = trimmed.indexOf('/');
         if (firstSlash < 0) {
-            // only one segment
             return trimmed;
         }
 
         int secondSlash = trimmed.indexOf('/', firstSlash + 1);
         if (secondSlash < 0) {
-            // exactly two segments
             return trimmed.replace('/','.');
         }
 
-        // more than two segments
         return trimmed.substring(0, secondSlash).replace('/','.');
     }
 }

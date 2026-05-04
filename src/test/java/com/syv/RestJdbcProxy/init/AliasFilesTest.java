@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AliasFilesTest {
@@ -20,20 +21,17 @@ class AliasFilesTest {
     void readJsonFilesLoadsJsonFilesByBaseName() throws Exception {
         Files.writeString(tempDir.resolve("prepared_statement.json"), """
                 {
-                  "alias": {
-                    "prepared-statements": {
-                      "sql-statement-to-prepare": "select * from customer where id = ?",
-                      "in-param": {
-                        "param": [
-                          {
-                            "jdbc-param-name": "ID",
-                            "jdbc-param-type": "BIGINT",
-                            "jdbc-param-index": 1,
-                            "jdbc-param-default": "1"
-                          }
-                        ]
+                  "operationDescriptor": {
+                    "type": "PREPARED_STATEMENT",
+                    "sql": "select * from customer where id = ?",
+                    "inputParameters": [
+                      {
+                        "name": "ID",
+                        "jdbcType": "BIGINT",
+                        "position": 1,
+                        "defaultValue": "1"
                       }
-                    }
+                    ]
                   }
                 }
                 """);
@@ -41,14 +39,23 @@ class AliasFilesTest {
         AliasFiles aliasFiles = new AliasFiles();
         ReflectionTestUtils.setField(aliasFiles, "folderPath", tempDir.toString());
 
-        Map<String, AliasConfig> result = aliasFiles.readJsonFiles();
+        Map<String, OperationConfig> result = aliasFiles.readJsonFiles();
 
         assertEquals(1, result.size());
         assertTrue(result.containsKey("prepared_statement"));
         assertEquals(
                 "select * from customer where id = ?",
-                result.get("prepared_statement").getAlias().getPreparedStatementAlias().getSqlStatementToPrepare()
+                result.get("prepared_statement").getOperationDescriptor().getSql()
         );
+    }
+
+    @Test
+    void readJsonFilesRejectsDescriptorWithoutOperationDescriptor() throws Exception {
+        Files.writeString(tempDir.resolve("invalid.json"), "{}");
+        AliasFiles aliasFiles = new AliasFiles();
+        ReflectionTestUtils.setField(aliasFiles, "folderPath", tempDir.toString());
+
+        assertThrows(IllegalArgumentException.class, aliasFiles::readJsonFiles);
     }
 
     @Test

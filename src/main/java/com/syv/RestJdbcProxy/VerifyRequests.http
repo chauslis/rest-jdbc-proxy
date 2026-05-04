@@ -1,386 +1,154 @@
-#GET http://localhost:8080/rjp/func?connection=DB1&procName=tst_function&aN=123
-#Accept: application/json
-#
-####
-#POST http://localhost:80/api/item
-#Content-Type: multipart/form-data; boundary=WebAppBoundary
-#
-#--WebAppBoundary
-#Content-Disposition: form-data; name="field-name"
-#
-#field-value
-#--WebAppBoundary--
-#
-#
-
-###
+### Demo raw SQL query. Requires app.demo-mode=true.
 GET http://localhost:8080/rjp/query?connection=DB1&sqlQuery=select%20*%20from%20customer%20where%20id%3C800
 
-###
-# curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "test_pkh.tst_function.json","aN": "123" }' http://localhost:8080/rjp/dynpst
+### Stored function alias
 POST http://localhost:8080/rjp/dynpst/test_pkh.tst_function
 Content-Type: application/json
 
 {
-  "connection": "DB1",
-  "aN": "123"
+  "_rjp": {
+    "connectionName": "DB1"
+  },
+  "params": {
+    "aN": "123"
+  }
 }
 
-###
-# curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "prepared_statement.json","ID": 7 }' http://localhost:8080/rjp/dynpst
+### Prepared statement alias
 POST http://localhost:8080/rjp/dynpst/prepared_statement
 Content-Type: application/json
 
 {
-  "connection": "DB1",
-  "ID": 7
+  "_rjp": {
+    "connectionName": "DB1"
+  },
+  "params": {
+    "AN": 7
+  }
 }
 
-
-###
+### Stored procedure with output parameters
 POST http://localhost:8080/rjp/dynpst/test_pkh.proc_with_OutParam
 Content-Type: application/json
 
 {
-  "connection": "DB1",
-  "ID": 123,
-  "NAME": "test",
-  "P": "INPUT p parametr value"
+  "_rjp": {
+    "connectionName": "DB1"
+  },
+  "params": {
+    "ID": 123,
+    "NAME": "test",
+    "P": "INPUT p parameter value"
+  }
 }
 
-###
-POST http://localhost:8080/rjp/dynpst/test_pkh.rc_function
+### Business parameter named connection is allowed inside params
+POST http://localhost:8080/rjp/dynpst/prepared_statement
 Content-Type: application/json
 
 {
-"connection": "DB1",
-"aN": "123"
+  "_rjp": {
+    "connectionName": "DB1"
+  },
+  "params": {
+    "connection": "business-value",
+    "AN": 7
+  }
 }
 
-###
-# curl -X POST -H "Content-Type: application/json" -d '{"connection": "DB1","procName": "prepared_statement.json","ID": 7 }' http://localhost:8080/rjp/dynpst
+### Batch prepared statement with mixed database routing
 POST http://localhost:8080/rjp/batch/prepared_statement
 Content-Type: application/json
 
 [
   {
-    "connection": "DB1",
-    "aN": "123"
+    "_rjp": {
+      "connectionName": "DB1"
+    },
+    "params": {
+      "AN": 3
+    }
   },
   {
-    "connection": "DB2",
-    "aN": "23"
+    "_rjp": {
+      "connectionName": "DB2"
+    },
+    "params": {
+      "AN": 7
+    }
   },
   {
-    "connection": "DB3",
-    "aN": "3"
-  },
-  {
-    "connection": "DB1",
-    "aN": "321"
+    "_rjp": {
+      "connectionName": "DB3"
+    },
+    "params": {
+      "AN": 9
+    }
   }
 ]
 
-
-
-###
-POST http://localhost:8080/rjp/batch/test_pkh.rc_function
-Content-Type: application/json
-
-[
-  {
-    "connection": "DB1",
-    "aN": "123"
-  },
-  {
-    "connection": "DB2",
-    "aN": "23"
-  },
-  {
-    "connection": "DB3",
-    "aN": "3"
-  },
-  {
-    "connection": "DB1",
-    "aN": "321"
-  }
-]
-
-###
+### Batch stored function
 POST http://localhost:8080/rjp/batch/test_pkh.tst_function
 Content-Type: application/json
 
-  [
-    {"connection": "DB1",
-      "aN": "123"
-    },
-    {"connection": "DB1",
-      "aN": "23"
-    },
-    {"connection": "DB1",
-      "aN": "3"
-    },
-    {"connection": "DB1",
-      "aN": "321"
-    }
-
-  ]
-
-###
-POST http://localhost:8080/rjp/batch/test_pkh.proc_with_OutParam
-Content-Type: application/json
-
 [
   {
-    "connection": "DB1",
-    "ID": 123,
-    "NAME": "test1",
-    "P": "INPUT p parametr value 1"
+    "_rjp": {
+      "connectionName": "DB1"
+    },
+    "params": {
+      "aN": "123"
+    }
   },
   {
-    "connection": "DB1",
-    "ID": 223,
-    "NAME": "test2",
-    "P": "INPUT p parametr value 2"
+    "_rjp": {
+      "connectionName": "DB2"
+    },
+    "params": {
+      "aN": "23"
+    }
   },
   {
-    "connection": "DB1",
-    "ID": 323,
-    "NAME": "test3",
-    "P": "INPUT p parametr value 3"
-  },
-  {
-    "connection": "DB1",
-    "ID": 423,
-    "NAME": "test4",
-    "P": "INPUT p parametr value 4"
-  },
-  {
-  "connection": "DB1",
-  "ID": 123,
-  "NAME": "test1",
-  "P": "INPUT p parametr value 1"
-},
-  {
-    "connection": "DB2",
-    "ID": 223,
-    "NAME": "test2",
-    "P": "INPUT p parametr value 2"
-  },
-  {
-    "connection": "DB3",
-    "ID": 323,
-    "NAME": "test3",
-    "P": "INPUT p parametr value 3"
-  }
-,
-  {
-    "connection": "DB1",
-    "ID": 423,
-    "NAME": "test4",
-    "P": "INPUT p parametr value 4"
-  },
-  {
-    "connection": "DB1",
-    "ID": 123,
-    "NAME": "test1",
-    "P": "INPUT p parametr value 1"
-  },
-  {
-    "connection": "DB1",
-    "ID": 223,
-    "NAME": "test2",
-    "P": "INPUT p parametr value 2"
-  },
-  {
-    "connection": "DB1",
-    "ID": 323,
-    "NAME": "test3",
-    "P": "INPUT p parametr value 3"
-  },
-  {
-    "connection": "DB1",
-    "ID": 423,
-    "NAME": "test4",
-    "P": "INPUT p parametr value 4"
-  },
-  {
-    "connection": "DB1",
-    "ID": 123,
-    "NAME": "test1",
-    "P": "INPUT p parametr value 1"
-  },
-  {
-    "connection": "DB1",
-    "ID": 223,
-    "NAME": "test2",
-    "P": "INPUT p parametr value 2"
-  },
-  {
-    "connection": "DB1",
-    "ID": 323,
-    "NAME": "test3",
-    "P": "INPUT p parametr value 3"
-  }
-,
-  {
-    "connection": "DB1",
-    "ID": 423,
-    "NAME": "test4",
-    "P": "INPUT p parametr value 4"
+    "_rjp": {
+      "connectionName": "DB1"
+    },
+    "params": {
+      "aN": "3"
+    }
   }
 ]
 
-###
-POST https://njtransfer.org/artweb/listeqs.cgi?OC+BB
-Content-Type: application/json
-
-{
-    "doSearch": "Search"
-}
-##################################################
-################## async
-
-###
-POST http://localhost:8080/rjp/startAsyncTaskTest
-###
-GET http://localhost:8080/rjp/taskResult/a0219e47-6d03-4105-af73-71937bcc30d2
-###
-GET http://localhost:8080/rjp/tasksStatus
-###
-GET http://localhost:8080/rjp/taskStatus/a0219e47-6d03-4105-af73-71937bcc30d2
-###
-GET http://localhost:8080/rjp/taskRemove/0672aede-335e-48fb-b2a6-85ef2ce4efd0
-
-###
+### Start async batch task
 POST http://localhost:8080/rjp/startAsyncTask/test_pkh.tst_function
 Content-Type: application/json
 
 [
-  {"connection": "DB1",
-    "aN": "123"
+  {
+    "_rjp": {
+      "connectionName": "DB1"
+    },
+    "params": {
+      "aN": "123"
+    }
   },
-  {"connection": "DB2",
-    "aN": "23"
-  },
-  {"connection": "DB1",
-    "aN": "3"
-  },
-  {"connection": "DB1",
-    "aN": "321"
+  {
+    "_rjp": {
+      "connectionName": "DB2"
+    },
+    "params": {
+      "aN": "23"
+    }
   }
 ]
 
-###
-POST http://localhost:8080/rjp/startAsyncTask/test_pkh.proc_with_OutParam
-Content-Type: application/json
+### Async task status
+GET http://localhost:8080/rjp/tasksStatus
 
-[
-  {
-    "connection": "DB1",
-    "ID": 123,
-    "NAME": "test1",
-    "P": "INPUT p parametr value 1"
-  },
-  {
-    "connection": "DB1",
-    "ID": 223,
-    "NAME": "test2",
-    "P": "INPUT p parametr value 2"
-  },
-  {
-    "connection": "DB1",
-    "ID": 323,
-    "NAME": "test3",
-    "P": "INPUT p parametr value 3"
-  },
-  {
-    "connection": "DB1",
-    "ID": 423,
-    "NAME": "test4",
-    "P": "INPUT p parametr value 4"
-  },
-  {
-    "connection": "DB1",
-    "ID": 123,
-    "NAME": "test1",
-    "P": "INPUT p parametr value 1"
-  },
-  {
-    "connection": "DB2",
-    "ID": 223,
-    "NAME": "test2",
-    "P": "INPUT p parametr value 2"
-  },
-  {
-    "connection": "DB3",
-    "ID": 323,
-    "NAME": "test3",
-    "P": "INPUT p parametr value 3"
-  }
-,
-  {
-    "connection": "DB1",
-    "ID": 423,
-    "NAME": "test4",
-    "P": "INPUT p parametr value 4"
-  },
-  {
-    "connection": "DB1",
-    "ID": 123,
-    "NAME": "test1",
-    "P": "INPUT p parametr value 1"
-  },
-  {
-    "connection": "DB1",
-    "ID": 223,
-    "NAME": "test2",
-    "P": "INPUT p parametr value 2"
-  },
-  {
-    "connection": "DB1",
-    "ID": 323,
-    "NAME": "test3",
-    "P": "INPUT p parametr value 3"
-  },
-  {
-    "connection": "DB1",
-    "ID": 423,
-    "NAME": "test4",
-    "P": "INPUT p parametr value 4"
-  },
-  {
-    "connection": "DB1",
-    "ID": 123,
-    "NAME": "test1",
-    "P": "INPUT p parametr value 1"
-  },
-  {
-    "connection": "DB1",
-    "ID": 223,
-    "NAME": "test2",
-    "P": "INPUT p parametr value 2"
-  },
-  {
-    "connection": "DB1",
-    "ID": 323,
-    "NAME": "test3",
-    "P": "INPUT p parametr value 3"
-  }
-,
-  {
-    "connection": "DB1",
-    "ID": 423,
-    "NAME": "test4",
-    "P": "INPUT p parametr value 4"
-  }
-]
+### Async task result
+GET http://localhost:8080/rjp/taskResult/{{taskId}}
 
-### nsed to fix
-##GET http://localhost:8080/rjp/startAsyncTask/query?connection=DB1&sqlQuery=select%20*%20from%20customer%20where%20id%3C800
+### Async task remove
+GET http://localhost:8080/rjp/taskRemove/{{taskId}}
 
-### Actuator example
-###curl -s http://localhost:8080/rjp/actuator/metrics | grep http.requests
-
+### Actuator metrics
 GET http://localhost:8080/rjp/actuator/metrics/http.requests.count
-

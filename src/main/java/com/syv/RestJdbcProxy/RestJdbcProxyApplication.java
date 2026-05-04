@@ -43,6 +43,5 @@ public class RestJdbcProxyApplication implements ApplicationContextAware {
 	public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
 		EntityManagerFactory entityManagerFactory = applicationContext.getBean(EntityManagerFactory.class);
 		this.applicationContext = applicationContext;
-		//log.info("entityManagerFactory: {}", entityManagerFactory);
 	}
 }
