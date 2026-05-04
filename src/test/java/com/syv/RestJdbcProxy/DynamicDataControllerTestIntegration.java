@@ -17,6 +17,7 @@ import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.OracleContainer;
 
 import java.nio.charset.StandardCharsets;
@@ -132,7 +133,7 @@ public class DynamicDataControllerTestIntegration {
         }
     }
 
-   // @Test
+    @Test
     public void testExecuteDynamicQuery() throws Exception {
         String connection = "DB1";
         String sqlQuery = "SELECT * FROM customer";
@@ -140,8 +141,10 @@ public class DynamicDataControllerTestIntegration {
         mockMvc.perform(get("/query")
                         .param("connection", connection)
                         .param("sqlQuery", sqlQuery))
-                .andExpect(status().isOk());
-        // Additional assertions can be added here
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(10))
+                .andExpect(jsonPath("$[0].ID").value(2));
     }
 
     @Test
@@ -162,6 +165,124 @@ public class DynamicDataControllerTestIntegration {
                         .andExpect(status().isOk())
                         .andExpect(content().json(expectedJson));
 //                        .andExpect(jsonPath("result").value("1"));
+    }
+
+    @Test
+    public void testExecutePreparedStatementAlias() throws Exception {
+        String jsonParameters = "{\n" +
+                "  \"connection\": \"DB1\",\n" +
+                "  \"ID\": 7\n" +
+                "}\n";
+
+        mockMvc.perform(post("/dynpst/prepared_statement")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonParameters))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(6))
+                .andExpect(jsonPath("$[0].connection").value("DB1"));
+    }
+
+    @Test
+    public void testExecuteStoredProcedureWithOutParams() throws Exception {
+        String jsonParameters = "{\n" +
+                "  \"connection\": \"DB1\",\n" +
+                "  \"ID\": 123,\n" +
+                "  \"NAME\": \"test\",\n" +
+                "  \"P\": \"INPUT p parameter value\"\n" +
+                "}\n";
+
+        mockMvc.perform(post("/dynpst/test_pkh.proc_with_OutParam")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonParameters))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].OUT1").value("out1"))
+                .andExpect(jsonPath("$[0].OUT2").value("test"))
+                .andExpect(jsonPath("$[0].OUT3").value("INPUT p parameter value"));
+    }
+
+    @Test
+    public void testExecuteBatchStoredFunction() throws Exception {
+        String jsonParameters = "[\n" +
+                "  {\"connection\": \"DB1\", \"aN\": \"123\"},\n" +
+                "  {\"connection\": \"DB1\", \"aN\": \"23\"},\n" +
+                "  {\"connection\": \"DB1\", \"aN\": \"3\"},\n" +
+                "  {\"connection\": \"DB1\", \"aN\": \"321\"}\n" +
+                "]\n";
+
+        mockMvc.perform(post("/batch/test_pkh.tst_function")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonParameters))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[0].result").value("1"))
+                .andExpect(jsonPath("$[1].result").value("1"))
+                .andExpect(jsonPath("$[2].result").value("1"))
+                .andExpect(jsonPath("$[3].result").value("1"));
+    }
+
+    @Test
+    public void testExecuteBatchPreparedStatement() throws Exception {
+        String jsonParameters = "[\n" +
+                "  {\"connection\": \"DB1\", \"aN\": 3},\n" +
+                "  {\"connection\": \"DB1\", \"aN\": 7}\n" +
+                "]\n";
+
+        mockMvc.perform(post("/batch/prepared_statement")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonParameters))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(8));
+    }
+
+    @Test
+    public void testAsyncBatchTaskLifecycle() throws Exception {
+        String jsonParameters = "[\n" +
+                "  {\"connection\": \"DB1\", \"aN\": \"123\"},\n" +
+                "  {\"connection\": \"DB1\", \"aN\": \"23\"},\n" +
+                "  {\"connection\": \"DB1\", \"aN\": \"3\"},\n" +
+                "  {\"connection\": \"DB1\", \"aN\": \"321\"}\n" +
+                "]\n";
+
+        MvcResult startResult = mockMvc.perform(post("/startAsyncTask/test_pkh.tst_function")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonParameters))
+                .andExpect(status().isOk())
+                .andReturn();
+        String taskId = startResult.getResponse().getContentAsString();
+
+        mockMvc.perform(get("/tasksStatus"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['" + taskId + "']").exists());
+
+        waitForTaskCompletion(taskId);
+
+        mockMvc.perform(get("/taskResult/{taskId}", taskId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[0].result").value("1"));
+
+        mockMvc.perform(get("/taskRemove/{taskId}", taskId))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Task is completed"));
+
+        mockMvc.perform(get("/taskStatus/{taskId}", taskId))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Task not found"));
+    }
+
+    private void waitForTaskCompletion(String taskId) throws Exception {
+        for (int i = 0; i < 20; i++) {
+            MvcResult statusResult = mockMvc.perform(get("/taskStatus/{taskId}", taskId))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            if ("Task is completed".equals(statusResult.getResponse().getContentAsString())) {
+                return;
+            }
+            Thread.sleep(250);
+        }
+        mockMvc.perform(get("/taskStatus/{taskId}", taskId))
+                .andExpect(content().string("Task is completed"));
     }
 
 }

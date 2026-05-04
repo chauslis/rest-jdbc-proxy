@@ -15,10 +15,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.SqlOutParameter;
 import org.springframework.jdbc.core.SqlParameter;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -61,7 +61,6 @@ public class DynamicDataService {
     }
 
 
-    @Async("taskExecutor")
     public CompletableFuture<List<Map<String, Object>>> setTaskEecuteStoredPreocWithDynamicParams(String catalog, String storedProcName, Map<String, String> formalInParams, List<Map<String, Object>> inParams, Map<String, String> formalOutParams) {//tbd add batch of outParams
 
         CompletableFuture<List<Map<String, Object>>> future = CompletableFuture.supplyAsync(() -> {
@@ -143,12 +142,16 @@ public class DynamicDataService {
         String connhection = inParams.get("connection").toString();
         inParams.remove("connection");
         DynamicDataSourceContextHolder.setDataSourceKey(connhection);
-        List<Object> parameters = inParams.entrySet().stream().map(param -> param.getValue()).collect(Collectors.toList());
-        List<Map<String, Object>> ret = jdbcTemplate.queryForList(sqlQuery, parameters.toArray());
-        return ret.stream().map(row -> {
-            row.put("connection", connhection);
-            return row;
-        }).collect(Collectors.toList());
+        try {
+            List<Object> parameters = inParams.entrySet().stream().map(param -> param.getValue()).collect(Collectors.toList());
+            List<Map<String, Object>> ret = jdbcTemplate.queryForList(sqlQuery, parameters.toArray());
+            return ret.stream().map(row -> {
+                row.put("connection", connhection);
+                return row;
+            }).collect(Collectors.toList());
+        } finally {
+            DynamicDataSourceContextHolder.clearDataSourceKey();
+        }
 
     }
 
@@ -162,39 +165,45 @@ public class DynamicDataService {
         SimpleJdbcCall simpleJdbcCall = new SimpleJdbcCall(jdbcTemplate).withCatalogName(catalog);
 
         DynamicDataSourceContextHolder.setDataSourceKey(inParams.get("connection").toString());
-        inParams.remove("connection");
-        String outParamsType = null;
-        if (formalOutParams != null && formalOutParams.size() > 0 && formalOutParams.containsKey("RESULT")) {
-            simpleJdbcCall.withFunctionName(storedProcName);
-            outParamsType = formalOutParams.get("RESULT");
+        try {
+            inParams.remove("connection");
+            String outParamsType = null;
+            Map<String, String> safeFormalOutParams = formalOutParams == null ? Map.of() : formalOutParams;
+            Map<String, String> safeFormalInParams = formalInParams == null ? Map.of() : formalInParams;
+            if (safeFormalOutParams.containsKey("RESULT")) {
+                simpleJdbcCall.withFunctionName(storedProcName);
+                outParamsType = safeFormalOutParams.get("RESULT");
 //            formalOutParams.remove("RESULT");
-        } else simpleJdbcCall.withProcedureName(storedProcName);
+            } else simpleJdbcCall.withProcedureName(storedProcName);
 
-        formalOutParams.entrySet()
-                .stream()
-                .filter(param -> !param.getKey().toUpperCase().equals("RESULT"))
-                .forEach(param -> {
-            simpleJdbcCall.declareParameters(new SqlOutParameter(param.getKey().toUpperCase(), convertStringToJdbcType(param.getValue().toUpperCase())));
-        });
+            safeFormalOutParams.entrySet()
+                    .stream()
+                    .filter(param -> !param.getKey().toUpperCase().equals("RESULT"))
+                    .forEach(param -> {
+                        simpleJdbcCall.declareParameters(new SqlOutParameter(param.getKey().toUpperCase(), convertStringToJdbcType(param.getValue().toUpperCase())));
+                    });
 
-        formalInParams.entrySet()
-                .stream()
-                .forEach(param -> {
-            simpleJdbcCall.declareParameters(new SqlParameter(param.getKey().toUpperCase(), convertStringToJdbcType(param.getValue().toUpperCase())));
-        });
-        Object result = null;
-        Map<String, Object> outParams;
-        if (outParamsType != null) {
-            int tType = convertStringToJdbcType(outParamsType);
-            Class<?> returnType = convertSqlTypeToJavaClass(tType);
-            outParams = new HashMap<>();
-            result = simpleJdbcCall.executeFunction(convertSqlTypeToJavaClass(tType), inParams);
-            log.debug("Result: {}", result);
-            outParams.put("result", result);// todo: support differnt out paranmetr function result
-        } else {
-            outParams = simpleJdbcCall.execute(inParams);
+            safeFormalInParams.entrySet()
+                    .stream()
+                    .forEach(param -> {
+                        simpleJdbcCall.declareParameters(new SqlParameter(param.getKey().toUpperCase(), convertStringToJdbcType(param.getValue().toUpperCase())));
+                    });
+            Object result = null;
+            Map<String, Object> outParams;
+            if (outParamsType != null) {
+                int tType = convertStringToJdbcType(outParamsType);
+                Class<?> returnType = convertSqlTypeToJavaClass(tType);
+                outParams = new HashMap<>();
+                result = simpleJdbcCall.executeFunction(convertSqlTypeToJavaClass(tType), inParams);
+                log.debug("Result: {}", result);
+                outParams.put("result", result);// todo: support differnt out paranmetr function result
+            } else {
+                outParams = simpleJdbcCall.execute(inParams);
+            }
+            return outParams;
+        } finally {
+            DynamicDataSourceContextHolder.clearDataSourceKey();
         }
-        return outParams;
 
     }
 
@@ -241,7 +250,7 @@ public class DynamicDataService {
         log.debug("ResponseEntity result: {}", outParams);
         return new ResponseEntity<>(ret, HttpStatus.OK);
     }
-    public ResponseEntity<List<Map<String, Object>>> executeAliasBatch1(String aliasName, List<Map<String, Object>> parameters) {
+    public ResponseEntity<List<Map<String, Object>>> executeAliasBatch(String aliasName, List<Map<String, Object>> parameters) {
         log.info("ResponseEntity parameters:  {}", parameters);
 
         String procName = aliasName;//(String) parameters.get("procName");
@@ -251,6 +260,9 @@ public class DynamicDataService {
             parameters.remove("procName");
 
         AliasConfig aliasConfig = aliasConfigMap.get(aliasName);
+        if (aliasConfig == null || aliasConfig.getAlias() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Alias not found: " + aliasName);
+        }
         ResponseEntity<List<Map<String, Object>>> responseEntity;
 
         // Iterate through each set of parameters and call the stored procedure
@@ -282,7 +294,7 @@ public class DynamicDataService {
     private ResponseEntity<List<Map<String, Object>>> getResponseFromBatchSP(List<Map<String, Object>> parameters, AliasConfig aliasConfig) {
 
         Map<String, String> inParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getInParam().getParam()));
-        Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getOutParam().getParam()));
+        Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(getOutParams(aliasConfig)));
 
         String connection = (String) parameters.get(0).get("connection");//TBD add option work with different connections
         String spName = getSpName(aliasConfig);
@@ -307,7 +319,7 @@ public class DynamicDataService {
 
         public  ResponseEntity<List<Map<String, Object>>> getResponseFromSP(Map<String, Object> parameters, AliasConfig aliasConfig) {
         Map<String, String> inParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getInParam().getParam()));
-        Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(aliasConfig.getAlias().getCallableStatements().getOutParam().getParam()));
+        Map<String, String> outParamsDescr = new HashMap<>(convertParamList2Map(getOutParams(aliasConfig)));
 
         String spName = getSpName(aliasConfig);
         Map<String, Object> outPartams = executeStoreFuncWithDynamicParams(getPackagename(spName), getSpName(spName), inParamsDescr, parameters, outParamsDescr);
@@ -320,6 +332,14 @@ public class DynamicDataService {
     private String getPackagename(String spName) {
         String[] parts = spName.split("\\.");
         return parts[0];
+    }
+
+    private List<AliasConfig.Param> getOutParams(AliasConfig aliasConfig) {
+        AliasConfig.CallableStatements callableStatements = aliasConfig.getAlias().getCallableStatements();
+        if (callableStatements == null || callableStatements.getOutParam() == null) {
+            return List.of();
+        }
+        return callableStatements.getOutParam().getParam();
     }
     public static int convertStringToJdbcType(String jdbcTypeName) {
         switch (jdbcTypeName.toUpperCase()) {
@@ -401,6 +421,9 @@ public class DynamicDataService {
     }
     private Map<String, String> convertParamList2Map(List<AliasConfig.Param> formalPrams) {
         Map<String, String> formalPramsMap = new HashMap<>();
+        if (formalPrams == null) {
+            return formalPramsMap;
+        }
         formalPrams.stream().forEach(param -> {
             formalPramsMap.put(param.getJdbcParamName().toUpperCase(), param.getJdbcParamType().toUpperCase());
         });

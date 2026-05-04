@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import javax.sql.DataSource;
 import java.sql.DriverManager;
@@ -20,6 +21,7 @@ import java.sql.SQLException;
 
 
 @SpringBootApplication
+@EnableScheduling
 public class RestJdbcProxyApplication implements ApplicationContextAware {
 	static{
 	try {

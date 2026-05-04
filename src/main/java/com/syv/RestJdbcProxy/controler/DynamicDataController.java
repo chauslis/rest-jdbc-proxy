@@ -6,9 +6,11 @@ import com.syv.RestJdbcProxy.config.DynamicDataSourceContextHolder;
 import com.syv.RestJdbcProxy.init.AliasConfig;
 import oracle.jdbc.proxy.annotation.Post;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 
 import java.util.List;
@@ -30,10 +32,13 @@ public class DynamicDataController {
     @Autowired
     public Map<String, AliasConfig> aliasConfigMap;
 
+    @Value("${app.demo-mode:false}")
+    private boolean demoMode;
+
 
     @RequestMapping(value = "/batch/{aliasName}/**")
     public ResponseEntity<List<Map<String, Object>>> executeAliasBatch(@PathVariable String aliasName, @RequestBody List<Map<String, Object>> parameters) {
-        return dynamicDataService.executeAliasBatch1( aliasName,  parameters);
+        return dynamicDataService.executeAliasBatch(aliasName, parameters);
     }
 
     @RequestMapping(value = "/dynpst/{aliasName}/**", method = RequestMethod.POST)
@@ -45,6 +50,9 @@ public class DynamicDataController {
         parameters.remove("procName");
 
         AliasConfig aliasConfig = aliasConfigMap.get(procName);
+        if (aliasConfig == null || aliasConfig.getAlias() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Alias not found: " + procName);
+        }
         ResponseEntity<List<Map<String, Object>>> responseEntity = null;
         if (aliasConfig.getAlias().getPreparedStatementAlias() != null) {
             responseEntity = dynamicDataService.getResponseFromQuerySingle(parameters, aliasConfig);
@@ -57,12 +65,19 @@ public class DynamicDataController {
 
     @GetMapping("/query")
     public ResponseEntity<List<Map<String, Object>>> executeDynamicQuery(@RequestParam(name = "connection") String connection, @RequestParam(name = "sqlQuery") String sqlQuery) {
+        if (!demoMode) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Raw SQL endpoint is available only when app.demo-mode=true");
+        }
         log.info("ResponseEntity parameters: connection: {}, sqlQuery: {}", connection, sqlQuery);
         DynamicDataSourceContextHolder.setDataSourceKey(connection);
 
-        List<Map<String, Object>> result = dynamicDataService.executeDynamicQuery(sqlQuery);
-        log.info("ResponseEntity result: {}", result);
-        return new ResponseEntity<>(result, HttpStatus.OK);
+        try {
+            List<Map<String, Object>> result = dynamicDataService.executeDynamicQuery(sqlQuery);
+            log.info("ResponseEntity result: {}", result);
+            return new ResponseEntity<>(result, HttpStatus.OK);
+        } finally {
+            DynamicDataSourceContextHolder.clearDataSourceKey();
+        }
     }
 
     private String getPackagename(String spName) {
@@ -84,9 +99,7 @@ public class DynamicDataController {
         // asyncService.processAsync(taskId);
         //  return "Task submitted. Your task ID is: " + taskId;
 
-       // return dynamicDataService.executeAliasBatch1( aliasName,  parameters);
-
-        asyncService.processAsync(taskId, dynamicDataService, aliasName,  parameters);
+        asyncService.processAsync(taskId, aliasName,  parameters);
 
   //      future.thenAccept(result -> System.out.println(result));
 
