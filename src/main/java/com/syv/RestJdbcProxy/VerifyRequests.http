@@ -151,4 +151,4 @@ GET http://localhost:8080/rjp/taskResult/{{taskId}}
 GET http://localhost:8080/rjp/taskRemove/{{taskId}}
 
 ### Actuator metrics
-GET http://localhost:8080/rjp/actuator/metrics/http.requests.count
+GET http://localhost:8080/rjp/actuator/metrics/http.requests.rjp.dynpst.count

@@ -170,6 +170,36 @@ cd adaptive-sql-execution-gateway
 ./gradlew bootRun
 ```
 
+### Docker Compose Deployment
+
+The repository includes a Docker Compose deployment with the gateway service and three Oracle databases. Each Oracle container initializes the `GT` schema from `src/test/resources/schema.sql`.
+
+```bash
+docker compose -f demo/docker-compose.yml up --build
+```
+
+The gateway HTTP API is exposed outside Docker at:
+
+```text
+http://localhost:8080/rjp
+```
+
+Oracle listener ports are also exposed for diagnostics:
+
+```text
+DB1: localhost:11521
+DB2: localhost:11522
+DB3: localhost:11523
+```
+
+Run the curl demonstration script after the containers are healthy:
+
+```bash
+./demo/docker/curl-demo.sh
+```
+
+The script demonstrates a single stored procedure call, a prepared statement call, a batch request, a mixed-database batch request, async execution, and actuator metrics.
+
 ### Database Configuration
 
 Configure database connections in `application.properties` with JDBC URLs supplied by environment variables:

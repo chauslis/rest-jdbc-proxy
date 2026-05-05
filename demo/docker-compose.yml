@@ -1,0 +1,80 @@
+name: adaptive-sql-execution-gateway
+
+x-oracle-common: &oracle-common
+  image: gvenzl/oracle-free:23-slim-faststart
+  environment:
+    ORACLE_PASSWORD: oracle
+    APP_USER: GT
+    APP_USER_PASSWORD: GT
+  volumes:
+    - ./docker/oracle/init/01-load-schema.sql:/container-entrypoint-initdb.d/01-load-schema.sql:ro
+    - ../src/test/resources/schema.sql:/opt/oracle/scripts/schema.sql:ro
+  healthcheck:
+    test: ["CMD", "healthcheck.sh"]
+    interval: 10s
+    timeout: 5s
+    retries: 30
+    start_period: 60s
+  restart: unless-stopped
+
+services:
+  oracle-db1:
+    <<: *oracle-common
+    container_name: rjp-oracle-db1
+    ports:
+      - "11521:1521"
+    volumes:
+      - oracle-db1-data:/opt/oracle/oradata
+      - ./docker/oracle/init/01-load-schema.sql:/container-entrypoint-initdb.d/01-load-schema.sql:ro
+      - ../src/test/resources/schema.sql:/opt/oracle/scripts/schema.sql:ro
+
+  oracle-db2:
+    <<: *oracle-common
+    container_name: rjp-oracle-db2
+    ports:
+      - "11522:1521"
+    volumes:
+      - oracle-db2-data:/opt/oracle/oradata
+      - ./docker/oracle/init/01-load-schema.sql:/container-entrypoint-initdb.d/01-load-schema.sql:ro
+      - ../src/test/resources/schema.sql:/opt/oracle/scripts/schema.sql:ro
+
+  oracle-db3:
+    <<: *oracle-common
+    container_name: rjp-oracle-db3
+    ports:
+      - "11523:1521"
+    volumes:
+      - oracle-db3-data:/opt/oracle/oradata
+      - ./docker/oracle/init/01-load-schema.sql:/container-entrypoint-initdb.d/01-load-schema.sql:ro
+      - ../src/test/resources/schema.sql:/opt/oracle/scripts/schema.sql:ro
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: demo/Dockerfile
+    container_name: adaptive-sql-execution-gateway
+    depends_on:
+      oracle-db1:
+        condition: service_healthy
+      oracle-db2:
+        condition: service_healthy
+      oracle-db3:
+        condition: service_healthy
+    environment:
+      DB1_JDBC_URL: jdbc:oracle:thin:GT/GT@oracle-db1:1521/FREEPDB1
+      DB2_JDBC_URL: jdbc:oracle:thin:GT/GT@oracle-db2:1521/FREEPDB1
+      DB3_JDBC_URL: jdbc:oracle:thin:GT/GT@oracle-db3:1521/FREEPDB1
+      JSON_FOLDER_PATH: /app/access_descriptor
+      APP_DEMO_MODE: "true"
+      APP_DATASOURCE_MAXIMUM_POOL_SIZE: "10"
+      APP_ASYNC_MAX_THREADS_PER_DB: "10"
+      APP_ASYNC_MAX_THREADS_TOTAL: "100"
+      APP_BATCH_MAX_THREADS_PER_REQUEST: "10"
+    ports:
+      - "8080:8080"
+    restart: "no"
+
+volumes:
+  oracle-db1-data:
+  oracle-db2-data:
+  oracle-db3-data:
