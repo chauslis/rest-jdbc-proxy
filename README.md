@@ -6,6 +6,12 @@ The main use case is to submit one HTTP request containing many database operati
 
 This is useful for systems where data is distributed across shards, partitions, tenants, or legacy database instances, and where clients need one HTTP API instead of direct JDBC access to every database.
 
+## Diagrams
+
+- [Collaboration diagram](doc/collaboration4LinkedIn.png)
+- [Architecture diagram](doc/adaptive_sql_gateway_architecture.svg)
+
+
 ## Features
 
 - **Multi-Database Support**: Works with JDBC-compatible databases such as Oracle, PostgreSQL, MySQL, SQL Server, and others
