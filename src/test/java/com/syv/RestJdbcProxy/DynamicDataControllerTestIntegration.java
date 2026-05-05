@@ -175,7 +175,7 @@ public class DynamicDataControllerTestIntegration {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(6))
-                .andExpect(jsonPath("$[0]._rjp_connectionName").value("DB1"));
+                .andExpect(jsonPath("$[0].connectionName").value("DB1"));
     }
 
     @Test
@@ -190,7 +190,7 @@ public class DynamicDataControllerTestIntegration {
                         .content(jsonParameters))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(6))
-                .andExpect(jsonPath("$[0]._rjp_connectionName").value("DB1"));
+                .andExpect(jsonPath("$[0].connectionName").value("DB1"));
     }
 
     @Test
@@ -257,11 +257,13 @@ public class DynamicDataControllerTestIntegration {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonParameters))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(4))
-                .andExpect(jsonPath("$[0].result").value("1"))
-                .andExpect(jsonPath("$[1].result").value("1"))
-                .andExpect(jsonPath("$[2].result").value("1"))
-                .andExpect(jsonPath("$[3].result").value("1"));
+                .andExpect(jsonPath("$.errors.length()").value(4))
+                .andExpect(jsonPath("$.errors[0].status").value("SUCCESS"))
+                .andExpect(jsonPath("$.results.length()").value(4))
+                .andExpect(jsonPath("$.results[0].result").value("1"))
+                .andExpect(jsonPath("$.results[1].result").value("1"))
+                .andExpect(jsonPath("$.results[2].result").value("1"))
+                .andExpect(jsonPath("$.results[3].result").value("1"));
     }
 
     @Test
@@ -273,9 +275,29 @@ public class DynamicDataControllerTestIntegration {
 
         mockMvc.perform(post("/batch/prepared_statement")
                         .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonParameters))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.errors.length()").value(2))
+                .andExpect(jsonPath("$.errors[0].status").value("SUCCESS"))
+                .andExpect(jsonPath("$.results.length()").value(8));
+    }
+
+    @Test
+    public void testExecuteBatchStoredProcedureWithOutParams() throws Exception {
+        String jsonParameters = "[\n" +
+                "  {\"_rjp\": {\"connectionName\": \"DB1\"}, \"params\": {\"ID\": 123, \"NAME\": \"test\", \"P\": \"value\"}}\n" +
+                "]\n";
+
+        mockMvc.perform(post("/batch/test_pkh.proc_with_OutParam")
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonParameters))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(8));
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].status").value("SUCCESS"))
+                .andExpect(jsonPath("$.results.length()").value(1))
+                .andExpect(jsonPath("$.results[0].OUT1").value("out1"))
+                .andExpect(jsonPath("$.results[0].OUT2").value("test"))
+                .andExpect(jsonPath("$.results[0].OUT3").value("value"));
     }
 
     @Test
@@ -302,8 +324,10 @@ public class DynamicDataControllerTestIntegration {
 
         mockMvc.perform(get("/taskResult/{taskId}", taskId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(4))
-                .andExpect(jsonPath("$[0].result").value("1"));
+                .andExpect(jsonPath("$.errors.length()").value(4))
+                .andExpect(jsonPath("$.errors[0].status").value("SUCCESS"))
+                .andExpect(jsonPath("$.results.length()").value(4))
+                .andExpect(jsonPath("$.results[0].result").value("1"));
 
         mockMvc.perform(get("/taskRemove/{taskId}", taskId))
                 .andExpect(status().isOk())

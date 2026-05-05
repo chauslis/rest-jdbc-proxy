@@ -1,6 +1,7 @@
 package com.syv.RestJdbcProxy.controler;
 
 import com.syv.RestJdbcProxy.config.DynamicDataSourceContextHolder;
+import com.syv.RestJdbcProxy.dto.BatchExecutionResponse;
 import com.syv.RestJdbcProxy.dto.GatewayMetadata;
 import com.syv.RestJdbcProxy.dto.GatewayRequest;
 import com.syv.RestJdbcProxy.service.AsyncService;
@@ -67,7 +68,7 @@ class DynamicDataControllerUnitTest {
     @Test
     void batchEndpointDelegatesToService() {
         List<GatewayRequest> requests = List.of(gatewayRequest("DB1", Map.of("ID", 1)));
-        ResponseEntity<List<Map<String, Object>>> expected = ResponseEntity.ok(List.of(Map.of("result", "ok")));
+        ResponseEntity<BatchExecutionResponse> expected = ResponseEntity.ok(batchResponse());
         when(dynamicDataService.executeAliasBatch("alias", requests)).thenReturn(expected);
 
         assertEquals(expected, controller.executeAliasBatch("alias", requests));
@@ -77,12 +78,13 @@ class DynamicDataControllerUnitTest {
     void asyncEndpointsDelegateToAsyncService() {
         when(asyncService.getTaskStatus("task-1")).thenReturn(AsyncService.TASK_IS_COMPLETED);
         when(asyncService.getTasksStatus()).thenReturn(Map.of("task-1", AsyncService.TASK_IS_COMPLETED));
-        when(asyncService.getTaskResult("task-1")).thenReturn(ResponseEntity.ok(List.of(Map.of("result", "ok"))));
+        ResponseEntity<BatchExecutionResponse> expectedResult = ResponseEntity.ok(batchResponse());
+        when(asyncService.getTaskResult("task-1")).thenReturn(expectedResult);
         when(asyncService.setTaskRemve("task-1")).thenReturn(AsyncService.TASK_IS_COMPLETED);
 
         assertEquals(AsyncService.TASK_IS_COMPLETED, controller.getTaskStatus("task-1"));
         assertEquals(Map.of("task-1", AsyncService.TASK_IS_COMPLETED), controller.getTasksStatus());
-        assertEquals(ResponseEntity.ok(List.of(Map.of("result", "ok"))), controller.getTaskResult("task-1"));
+        assertEquals(expectedResult, controller.getTaskResult("task-1"));
         assertEquals(AsyncService.TASK_IS_COMPLETED, controller.getTaskRemove("task-1"));
     }
 
@@ -116,5 +118,11 @@ class DynamicDataControllerUnitTest {
         request.setRjp(metadata);
         request.setParams(params);
         return request;
+    }
+
+    private static BatchExecutionResponse batchResponse() {
+        BatchExecutionResponse response = new BatchExecutionResponse();
+        response.setResults(List.of(Map.of("result", "ok")));
+        return response;
     }
 }

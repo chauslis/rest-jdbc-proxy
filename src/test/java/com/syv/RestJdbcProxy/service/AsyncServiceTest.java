@@ -1,5 +1,6 @@
 package com.syv.RestJdbcProxy.service;
 
+import com.syv.RestJdbcProxy.dto.BatchExecutionResponse;
 import com.syv.RestJdbcProxy.dto.GatewayMetadata;
 import com.syv.RestJdbcProxy.dto.GatewayRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,8 +36,8 @@ class AsyncServiceTest {
     @Test
     void processAsyncStoresCompletedTaskAndReturnsResult() {
         List<GatewayRequest> requests = List.of(gatewayRequest("DB1", Map.of("id", 1)));
-        ResponseEntity<List<Map<String, Object>>> expected =
-                new ResponseEntity<>(List.of(Map.of("result", "ok")), HttpStatus.OK);
+        ResponseEntity<BatchExecutionResponse> expected =
+                new ResponseEntity<>(batchResponse(), HttpStatus.OK);
         when(dynamicDataService.executeAliasBatch("alias", requests)).thenReturn(expected);
 
         asyncService.processAsync("task-1", "alias", requests);
@@ -49,8 +50,8 @@ class AsyncServiceTest {
 
     @Test
     void removeCompletedTaskAndReportMissingTask() {
-        ResponseEntity<List<Map<String, Object>>> expected =
-                new ResponseEntity<>(List.of(Map.of("result", "ok")), HttpStatus.OK);
+        ResponseEntity<BatchExecutionResponse> expected =
+                new ResponseEntity<>(batchResponse(), HttpStatus.OK);
         when(dynamicDataService.executeAliasBatch("alias", List.of())).thenReturn(expected);
 
         asyncService.processAsync("task-1", "alias", List.of());
@@ -63,9 +64,9 @@ class AsyncServiceTest {
 
     @Test
     void reportsCancelledAndInProgressTasks() {
-        CompletableFuture<ResponseEntity<List<Map<String, Object>>>> cancelled = new CompletableFuture<>();
+        CompletableFuture<ResponseEntity<BatchExecutionResponse>> cancelled = new CompletableFuture<>();
         cancelled.cancel(false);
-        CompletableFuture<ResponseEntity<List<Map<String, Object>>>> inProgress = new CompletableFuture<>();
+        CompletableFuture<ResponseEntity<BatchExecutionResponse>> inProgress = new CompletableFuture<>();
 
         asyncService.putTask("cancelled", cancelled);
         asyncService.putTask("running", inProgress);
@@ -79,9 +80,9 @@ class AsyncServiceTest {
     @Test
     void removeExpiredTasksDeletesOnlyTerminalTasksAfterTtl() {
         ReflectionTestUtils.setField(asyncService, "taskTtlMillis", 0L);
-        CompletableFuture<ResponseEntity<List<Map<String, Object>>>> completed =
-                CompletableFuture.completedFuture(ResponseEntity.ok(List.of(Map.of("result", "ok"))));
-        CompletableFuture<ResponseEntity<List<Map<String, Object>>>> running = new CompletableFuture<>();
+        CompletableFuture<ResponseEntity<BatchExecutionResponse>> completed =
+                CompletableFuture.completedFuture(ResponseEntity.ok(batchResponse()));
+        CompletableFuture<ResponseEntity<BatchExecutionResponse>> running = new CompletableFuture<>();
 
         asyncService.putTask("completed", completed);
         asyncService.putTask("running", running);
@@ -94,8 +95,8 @@ class AsyncServiceTest {
     @Test
     void negativeTtlDisablesAutomaticCleanup() {
         ReflectionTestUtils.setField(asyncService, "taskTtlMillis", -1L);
-        CompletableFuture<ResponseEntity<List<Map<String, Object>>>> completed =
-                CompletableFuture.completedFuture(ResponseEntity.ok(List.of(Map.of("result", "ok"))));
+        CompletableFuture<ResponseEntity<BatchExecutionResponse>> completed =
+                CompletableFuture.completedFuture(ResponseEntity.ok(batchResponse()));
 
         asyncService.putTask("completed", completed);
 
@@ -110,5 +111,11 @@ class AsyncServiceTest {
         request.setRjp(metadata);
         request.setParams(params);
         return request;
+    }
+
+    private static BatchExecutionResponse batchResponse() {
+        BatchExecutionResponse response = new BatchExecutionResponse();
+        response.setResults(List.of(Map.of("result", "ok")));
+        return response;
     }
 }

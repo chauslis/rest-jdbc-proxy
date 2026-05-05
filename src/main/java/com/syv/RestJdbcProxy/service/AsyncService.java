@@ -1,5 +1,6 @@
 package com.syv.RestJdbcProxy.service;
 
+import com.syv.RestJdbcProxy.dto.BatchExecutionResponse;
 import com.syv.RestJdbcProxy.dto.GatewayRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,24 +35,26 @@ public class AsyncService {
     @Value("${app.async.task-ttl-ms:300000}")
     private long taskTtlMillis;
 
-    public CompletableFuture<  ResponseEntity<List<Map<String, Object>>>> processAsyncTest1(String taskId) {
-        CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future = CompletableFuture.supplyAsync(() -> {
+    public CompletableFuture<ResponseEntity<BatchExecutionResponse>> processAsyncTest1(String taskId) {
+        CompletableFuture<ResponseEntity<BatchExecutionResponse>> future = CompletableFuture.supplyAsync(() -> {
             try {
                 Thread.sleep(30000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            return new ResponseEntity<>(List.of(
+            BatchExecutionResponse response = new BatchExecutionResponse();
+            response.setResults(List.of(
                     Map.of("Field_1", "Test 1",
                             "Field_2", "John Doe",
                     "Field_3", 30)
-            ), HttpStatus.OK);
+            ));
+            return new ResponseEntity<>(response, HttpStatus.OK);
         }, executorService);
         putTask(taskId, future);
         return future;
     }
 
-    public ResponseEntity<List<Map<String, Object>>> getTaskResult(String taskId) {
+    public ResponseEntity<BatchExecutionResponse> getTaskResult(String taskId) {
         try {
             return tasks.get(taskId).future().get();
         } catch (InterruptedException e) {
@@ -65,7 +68,7 @@ public class AsyncService {
         if (taskRecord == null) {
             return TASK_NOT_FOUND;
         }
-        CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future = taskRecord.future();
+        CompletableFuture<ResponseEntity<BatchExecutionResponse>> future = taskRecord.future();
         if (future.isCancelled()) {
             return TASK_IS_CANCELLED;
         } else if (future.isDone()) {
@@ -83,7 +86,7 @@ public class AsyncService {
             .forEach(
                     entry -> {
                         String st;
-                        CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future = entry.getValue().future();
+                        CompletableFuture<ResponseEntity<BatchExecutionResponse>> future = entry.getValue().future();
                         if (future.isCancelled()) {
                             st = TASK_IS_CANCELLED;
                         } else if (future.isDone()) {
@@ -97,7 +100,7 @@ public class AsyncService {
         return status;
     }
     public void processAsync(String taskId, String aliasName, List<GatewayRequest> requests) {
-        CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future = CompletableFuture.supplyAsync(
+        CompletableFuture<ResponseEntity<BatchExecutionResponse>> future = CompletableFuture.supplyAsync(
                 () -> dynamicDataService.executeAliasBatch(aliasName, requests),
                 executorService
         );
@@ -128,24 +131,24 @@ public class AsyncService {
         return initialSize - tasks.size();
     }
 
-    void putTask(String taskId, CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future) {
+    void putTask(String taskId, CompletableFuture<ResponseEntity<BatchExecutionResponse>> future) {
         TaskRecord taskRecord = new TaskRecord(future);
         future.whenComplete((result, throwable) -> taskRecord.markCompleted());
         tasks.put(taskId, taskRecord);
     }
 
     private static class TaskRecord {
-        private final CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future;
+        private final CompletableFuture<ResponseEntity<BatchExecutionResponse>> future;
         private volatile Long completedAtMillis;
 
-        private TaskRecord(CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future) {
+        private TaskRecord(CompletableFuture<ResponseEntity<BatchExecutionResponse>> future) {
             this.future = future;
             if (future.isDone() || future.isCancelled()) {
                 markCompleted();
             }
         }
 
-        private CompletableFuture<ResponseEntity<List<Map<String, Object>>>> future() {
+        private CompletableFuture<ResponseEntity<BatchExecutionResponse>> future() {
             return future;
         }
 

@@ -53,7 +53,18 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	exclude '**/*Integration.class'
 	finalizedBy jacocoTestReport
+}
+
+tasks.register('integrationTest', Test) {
+	description = 'Runs integration tests that may require Docker/Testcontainers.'
+	group = 'verification'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform()
+	include '**/*Integration.class'
+	shouldRunAfter test
 }
 
 jacocoTestReport {

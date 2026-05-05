@@ -100,7 +100,7 @@ Tests:
 - prepared statement descriptor loading
 - positional JDBC parameter binding
 - query execution against `CUSTOMER`
-- `_rjp_connectionName` response metadata
+- `connectionName` response metadata
 
 ### Batch Request
 
@@ -116,6 +116,7 @@ Tests:
 - batch execution
 - partitioning through configured batch thread settings
 - stored function execution for multiple input rows
+- batch response envelope with `errors` and `results`
 
 ### Mixed-Database Batch Request
 
@@ -131,6 +132,7 @@ Tests:
 - per-item database routing through `_rjp.connectionName`
 - parallel execution paths against multiple Oracle containers
 - prepared statement execution against each database
+- successful rows returned in the batch `results` collection
 
 ### Async Execution
 
@@ -148,6 +150,7 @@ Tests:
 - background batch execution
 - task status polling
 - async result retrieval
+- async `taskResult` response using the same batch `errors` and `results` envelope
 
 ### Metrics Endpoint
 

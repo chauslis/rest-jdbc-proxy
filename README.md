@@ -87,7 +87,7 @@ The request routes to `DB1`. The `params.connection` value remains a business pa
 
 Invalid envelopes, such as missing `_rjp`, missing `_rjp.connectionName`, or missing `params`, return `400 BAD_REQUEST`. Missing aliases return `404 NOT_FOUND`.
 
-Prepared statement result rows include `_rjp_connectionName` when the gateway adds routing context to the response. The service does not add a `connection` field to result rows.
+Prepared statement result rows include `connectionName` when the gateway adds routing context to the response. The service does not add a `connection` field to result rows.
 
 ## Use Cases
 
@@ -151,6 +151,8 @@ Typical modernization flow:
 ### Parallel Data Processing
 
 Large input datasets can be sent in one batch request. The service splits the dataset into sublists and executes those sublists with the configured executor.
+
+Batch responses use a structured envelope with `errors` first and `results` second. Successful database outputs are returned in `results`; per-record database execution failures are returned in `errors` with the original input record and sanitized error details.
 
 This is useful for bulk validation, customer/account enrichment, fan-out reads across database partitions, parallel stored procedure execution, migration jobs, and reconciliation jobs.
 
@@ -319,6 +321,8 @@ app.async.max-threads-total=100
 app.async.task-ttl-ms=300000
 app.async.task-cleanup-interval-ms=60000
 app.batch.max-threads-per-request=10
+app.batch.error-details-mode=CODE_AND_MESSAGE
+app.batch.error-records-mode=ALL
 ```
 
 The effective executor size is calculated from the number of configured database connections:
@@ -403,6 +407,122 @@ POST /rjp/batch/{aliasName}
 
 The service splits the list into partitions and executes the partitions in parallel. During execution, the dynamic data source context is set from each item's `_rjp.connectionName` before calling JDBC.
 
+Response:
+
+```json
+{
+  "errors": [
+    {
+      "_rjp": { "connectionName": "DB1" },
+      "params": { "ID": 1 },
+      "status": "SUCCESS"
+    }
+  ],
+  "results": [
+    {
+      "ID": 1,
+      "FIRST_NAME": "Chloe",
+      "connectionName": "DB1"
+    }
+  ]
+}
+```
+
+### Batch Error Reporting
+
+All batch responses return an object with `errors` as the first JSON field and `results` as the second JSON field.
+
+- `errors` is always present. In `FAILED_ONLY` mode it is empty when no record fails; in `ALL` mode it contains every input record with execution status.
+- `results` contains successful database outputs: prepared statement rows, stored procedure out params, or function results.
+- Failed records include the original `_rjp` metadata, original `params`, `status: FAILED`, and an `error` object.
+- The gateway reports best-effort per-record execution. One record failure does not automatically roll back successful records from other records.
+- Raw stack traces are not returned.
+
+Partial failure example:
+
+```json
+{
+  "errors": [
+    {
+      "_rjp": { "connectionName": "DB2" },
+      "params": { "ID": 223, "NAME": "bad" },
+      "status": "FAILED",
+      "error": {
+        "code": "SQL_ERROR",
+        "message": "ORA-00001: unique constraint violated"
+      }
+    }
+  ],
+  "results": [
+    {
+      "OUT1": "out1",
+      "OUT2": "good"
+    }
+  ]
+}
+```
+
+Error detail level:
+
+```properties
+app.batch.error-details-mode=CODE_ONLY
+app.batch.error-details-mode=CODE_AND_MESSAGE
+app.batch.error-details-mode=FULL
+```
+
+`CODE_ONLY` returns only a stable application error code. `CODE_AND_MESSAGE` also returns a sanitized error message. `FULL` additionally returns the exception type and should be reserved for local/demo environments.
+
+Error record inclusion:
+
+```properties
+app.batch.error-records-mode=FAILED_ONLY
+app.batch.error-records-mode=ALL
+```
+
+`FAILED_ONLY` includes only failed input records in `errors`. `ALL` includes every input record in `errors` as an execution record with `status: SUCCESS` or `status: FAILED`.
+
+`CODE_ONLY` example:
+
+```json
+{
+  "errors": [
+    {
+      "_rjp": { "connectionName": "DB2" },
+      "params": { "ID": 223 },
+      "status": "FAILED",
+      "error": { "code": "SQL_ERROR" }
+    }
+  ],
+  "results": []
+}
+```
+
+`ALL` mode example:
+
+```json
+{
+  "errors": [
+    {
+      "_rjp": { "connectionName": "DB1" },
+      "params": { "ID": 123 },
+      "status": "SUCCESS"
+    },
+    {
+      "_rjp": { "connectionName": "DB2" },
+      "params": { "ID": 223 },
+      "status": "FAILED",
+      "error": {
+        "code": "SQL_ERROR",
+        "message": "database error message"
+      }
+    }
+  ],
+  "results": [
+    { "OUT1": "out1" }
+  ]
+}
+```
+
 ### Async Batch Alias
 
 ```text
@@ -481,13 +601,21 @@ curl -X POST http://localhost:8080/rjp/batch/prepared_statement \
 
 ## Testing and Coverage
 
-Run the full verification suite:
+Run unit tests and coverage verification:
 
 ```bash
 ./gradlew check
 ```
 
-The suite includes unit tests for request envelope validation, dynamic data source context handling, dataset splitting, mixed-database batch parameters, async task management, controller delegation, request metrics, descriptor loading, Oracle-backed integration tests using Testcontainers, and JaCoCo coverage verification.
+The default `test` and `check` tasks run unit tests only and do not start Docker/Testcontainers.
+
+Run Oracle-backed integration tests explicitly:
+
+```bash
+./gradlew integrationTest
+```
+
+The unit suite includes tests for request envelope validation, dynamic data source context handling, dataset splitting, mixed-database batch parameters with Mockito, async task management, controller delegation, request metrics, descriptor loading, and JaCoCo coverage verification. The `integrationTest` task runs the Oracle-backed Testcontainers suite.
 
 The HTML coverage report is generated at:
 

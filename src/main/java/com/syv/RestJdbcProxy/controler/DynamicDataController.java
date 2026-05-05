@@ -3,6 +3,7 @@ package com.syv.RestJdbcProxy.controler;
 import com.syv.RestJdbcProxy.service.AsyncService;
 import com.syv.RestJdbcProxy.service.DynamicDataService;
 import com.syv.RestJdbcProxy.config.DynamicDataSourceContextHolder;
+import com.syv.RestJdbcProxy.dto.BatchExecutionResponse;
 import com.syv.RestJdbcProxy.dto.GatewayRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,8 +33,8 @@ public class DynamicDataController {
     private boolean demoMode;
 
 
-    @RequestMapping(value = "/batch/{aliasName}/**")
-    public ResponseEntity<List<Map<String, Object>>> executeAliasBatch(@PathVariable String aliasName, @RequestBody List<GatewayRequest> requests) {
+    @PostMapping(value = "/batch/{aliasName}/**")
+    public ResponseEntity<BatchExecutionResponse> executeAliasBatch(@PathVariable String aliasName, @RequestBody List<GatewayRequest> requests) {
         return dynamicDataService.executeAliasBatch(aliasName, requests);
     }
 
@@ -71,9 +72,8 @@ public class DynamicDataController {
         return taskId;
     }
     @GetMapping("/taskResult/{taskId}")
-    public  ResponseEntity<List<Map<String, Object>>> getTaskResult(@PathVariable String taskId) {
-        ResponseEntity responseEntity = asyncService.getTaskResult(taskId);
-        return responseEntity;
+    public ResponseEntity<BatchExecutionResponse> getTaskResult(@PathVariable String taskId) {
+        return asyncService.getTaskResult(taskId);
     }
 
     @GetMapping("/taskStatus/{taskId}")
@@ -94,7 +94,7 @@ public class DynamicDataController {
     @PostMapping("/startAsyncTaskTest")
     public String startAsyncTask() {
         String taskId = UUID.randomUUID().toString();
-        CompletableFuture<  ResponseEntity<List<Map<String, Object>>>> future = asyncService.processAsyncTest1(taskId);
+        CompletableFuture<ResponseEntity<BatchExecutionResponse>> future = asyncService.processAsyncTest1(taskId);
         future.thenAccept(result -> System.out.println(result));
         return "Task " + taskId + " started, check later for result.";
     }
