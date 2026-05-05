@@ -35,7 +35,7 @@ That schema creates:
 From the project root:
 
 ```bash
-docker compose -f demo/docker-compose.yml up --build
+docker compose -f demo/docker-compose.yml up -d --build
 ```
 
 Wait until all Oracle containers are healthy and the gateway starts. The first startup can take several minutes because Oracle images need to initialize their data files.
