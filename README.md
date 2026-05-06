@@ -173,7 +173,7 @@ This is useful for bulk validation, customer/account enrichment, fan-out reads a
 ### Quick Start
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:chauslis/adaptive-sql-execution-gateway.git
 cd adaptive-sql-execution-gateway
 ./gradlew bootRun
 ```

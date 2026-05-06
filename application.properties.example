@@ -1,4 +1,4 @@
-# Example configuration for RestJdbcProxy
+# Example configuration for Adaptive SQL Execution Gateway
 # Copy this file to application.properties and update with your database settings
 
 # JPA/Hibernate settings
