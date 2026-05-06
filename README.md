@@ -173,7 +173,7 @@ This is useful for bulk validation, customer/account enrichment, fan-out reads a
 ### Quick Start
 
 ```bash
-git clone git@github.com:chauslis/adaptive-sql-execution-gateway.git
+git clone https://github.com/yuriy-stadnik/adaptive-sql-execution-gateway
 cd adaptive-sql-execution-gateway
 ./gradlew bootRun
 ```
@@ -183,7 +183,7 @@ cd adaptive-sql-execution-gateway
 The repository includes a Docker Compose deployment with the gateway service and three Oracle databases. Each Oracle container initializes the `GT` schema from `src/test/resources/schema.sql`.
 
 ```bash
-docker compose -f demo/docker-compose.yml up --build
+docker compose -f demo/docker-compose.yml up -d --build
 ```
 
 The gateway HTTP API is exposed outside Docker at:
